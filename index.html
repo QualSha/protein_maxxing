@@ -95,7 +95,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:cen
 .legend-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 
 /* GRID */
-.grid1 { display: block; width: 100%; }
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
 
@@ -523,13 +522,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
         <div class="chart-card" style="margin-bottom:0;">
           <div class="chart-label">Harga rata-rata nasional — Jan 2024 s.d. Apr 2026 (Rp/kg)</div>
           <div class="legend">
-            <span class="legend-item" data-group="sapi" onclick="toggleLegend(this)">
+            <span class="legend-item dimmed" data-label="Daging Sapi" onclick="toggleLegend(this)">
               <span class="legend-dot" style="background:var(--sapi)"></span>Daging sapi
             </span>
-            <span class="legend-item" data-group="ayam-telur" onclick="toggleLegend(this)">
+            <span class="legend-item" data-label="Daging Ayam" onclick="toggleLegend(this)">
               <span class="legend-dot" style="background:var(--ayam)"></span>Daging ayam
             </span>
-            <span class="legend-item" data-group="ayam-telur" onclick="toggleLegend(this)">
+            <span class="legend-item" data-label="Telur Ayam" onclick="toggleLegend(this)">
               <span class="legend-dot" style="background:var(--telur)"></span>Telur ayam
             </span>
           </div>
@@ -774,12 +773,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   </div>
 </section>
 
-<!-- DAYA BELI -->
+<!-- SCENE 6: DAYA BELI -->
 <section class="section sec-white" id="s7" data-label="Daya Beli">
   <div class="section-inner">
   <div class="container">
     <div class="reveal">
-      <div class="eyebrow">Daya Beli</div>
+      <div class="eyebrow">07 — Daya Beli</div>
       <h2 class="sec-title">Berapa persen gaji<br>untuk <em>protein?</em></h2>
       <p class="sec-lead">Affordability Index: berapa persen UMP yang dibutuhkan untuk memenuhi 60g protein per hari selama sebulan, setara kebutuhan protein dewasa aktif. Data menggunakan UMP 2025 dan harga Apr 2026.</p>
     </div>
@@ -788,32 +787,28 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--rust);"></div>
         <div class="kpi-tag">Beban protein tertinggi</div>
-        <div class="kpi-val" id="afford-worst-daily">-</div> 
-        <div class="kpi-unit" id="afford-worst-desc">-</div>
-        <div class="kpi-divider"></div>
-        <div class="kpi-note" id="afford-worst-footer">-</div>
+        <div class="kpi-val" id="afford-worst-val">-</div>
+        <div class="kpi-unit" id="afford-worst-unit">-</div>
+        <div class="afford-zone zone-red" style="margin-top:6px;">Rata-rata nasional</div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--gold);"></div>
         <div class="kpi-tag">Beban protein menengah</div>
-        <div class="kpi-val" id="afford-natavg-daily">-</div> 
-        <div class="kpi-unit" id="afford-natavg-desc">-</div>
+        <div class="kpi-val" id="afford-natavg-val">-</div>
+        <div class="kpi-unit" id="afford-natavg-unit">-</div>
         <div class="kpi-divider"></div>
-        <div class="kpi-note" id="afford-natavg-footer">-</div>
+        <div class="kpi-note">Persentase UMP untuk memenuhi 60g protein/hari selama 30 hari</div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--sage);"></div>
         <div class="kpi-tag">Beban protein terendah</div>
-        <div class="kpi-val" id="afford-best-daily">-</div> 
-        <div class="kpi-unit" id="afford-best-desc">-</div>
-        <div class="kpi-divider"></div>
-        <div class="kpi-note" id="afford-best-footer">-</div>
+        <div class="kpi-val" id="afford-best-val">-</div>
+        <div class="kpi-unit" id="afford-best-unit">-</div>
+        <div class="afford-zone zone-ok" style="margin-top:6px;">Rata-rata nasional</div>
       </div>
     </div>
 
-    <div class="grid1 reveal">
+    <div class="grid2 reveal">
       <div class="chart-card" style="margin-bottom:0;">
         <div class="chart-label">10 provinsi dengan beban protein telur tertinggi (% UMP 2025, harga Apr 2026)</div>
         <div class="chart-area" style="height:280px;"><canvas id="c7a"></canvas></div>
@@ -831,7 +826,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   </div>
 </section>
 
-<!-- PENUTUP -->
+<!-- SCENE 7: PENUTUP -->
 <section class="section" id="s8" data-label="Kesimpulan" style="background:var(--brown);">
   <div class="section-inner">
   <div class="container">
@@ -1066,42 +1061,38 @@ function buildSim() {
 }
 
 window.toggleLegend = function(el) {
-  // Ambil instance canvas chart di card ini
   const chartId = el.closest('.chart-card').querySelector('canvas').id;
   const chart = Chart.getChart(chartId);
   if (!chart) return;
 
-  const group = el.dataset.group;
   const allItems = el.parentElement.querySelectorAll('.legend-item');
-  
-  // Cek apakah tombol yang diklik saat ini adalah SATU-SATUNYA yang sedang aktif
-  const isActive = !el.classList.contains('dimmed') && 
-                   Array.from(allItems).some(item => item.classList.contains('dimmed'));
+  const dsLabel  = el.dataset.label; // label dataset yang diklik
 
-  if (isActive) {
-    // ATURAN 3.4: Klik legenda yang sedang aktif -> Tampilkan Semua
-    allItems.forEach(item => item.classList.remove('dimmed'));
+  // Cari dataset index berdasarkan data-label
+  const dsIndex = chart.data.datasets.findIndex(ds =>
+    ds.label === dsLabel
+  );
+  if (dsIndex === -1) return;
+
+  // Cek apakah minimal ada 1 dataset lain yang visible
+  const currentlyVisible = chart.data.datasets
+    .map((ds, i) => ({ hidden: ds.hidden, i }))
+    .filter(d => !d.hidden);
+
+  const clickedIsVisible = !chart.data.datasets[dsIndex].hidden;
+
+  // Kalau yang diklik satu-satunya yang visible, jangan sembunyikan (minimal 1 harus tampil)
+  if (clickedIsVisible && currentlyVisible.length === 1) {
+    // Show semua sebagai reset
     chart.data.datasets.forEach(ds => ds.hidden = false);
+    allItems.forEach(item => item.classList.remove('dimmed'));
   } else {
-    // ATURAN 3.3: Redupkan semua, lalu nyalakan sesuai grup yang diklik
-    allItems.forEach(item => {
-      if (item.dataset.group === group) item.classList.remove('dimmed');
-      else item.classList.add('dimmed');
-    });
-    
-    // ATURAN 3.1 & 3.2: Filter dataset yang muncul
-    chart.data.datasets.forEach((ds) => {
-      // Menggunakan nama label dataset ('Daging Sapi', 'Daging Ayam', dst)
-      const isSapi = ds.label.toLowerCase().includes('sapi');
-      
-      if (group === 'sapi') {
-        ds.hidden = !isSapi; // Hanya sapi yang false (ditampilkan)
-      } else if (group === 'ayam-telur') {
-        ds.hidden = isSapi;  // Sapi disembunyikan, sisanya (ayam & telur) ditampilkan
-      }
-    });
+    // Toggle dataset yang diklik
+    chart.data.datasets[dsIndex].hidden = clickedIsVisible;
+    el.classList.toggle('dimmed', clickedIsVisible);
   }
-  chart.update(); // Render ulang chart dengan kondisi terbaru
+
+  chart.update();
 };
 
 window.addEventListener('DOMContentLoaded', () => {
