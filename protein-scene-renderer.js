@@ -914,20 +914,22 @@ function renderHeroKPIs(scenes) {
     const seasonal = scenes?.seasonal?.rows || {};
     const MONTHS     = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
     const MONTHS_ID  = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+    
+    // 1. Skala warna diubah menjadi Linear: Low (Terang) -> High (Pekat)
     const ROWS = [
-      { key: "sapi",  label: "🐄 Sapi",  colorHigh: [90,122,82],   colorLow: [164,210,156] },
-      { key: "ayam",  label: "🍗 Ayam",  colorHigh: [180,120,20],  colorLow: [220,185,110] },
-      { key: "telur", label: "🥚 Telur", colorHigh: [180,65,30],   colorLow: [225,150,120] }
+      { key: "sapi",  label: "🐄 Sapi",  colorHigh: [50,90,40],    colorLow: [230,235,225] },
+      { key: "ayam",  label: "🍗 Ayam",  colorHigh: [190,95,10],   colorLow: [245,230,210] },
+      { key: "telur", label: "🥚 Telur", colorHigh: [180,40,15],   colorLow: [245,220,210] }
     ];
-    const neutral = [237, 229, 212]; // --cream2
 
-    // Build index per komoditas (baseline = mean = 100)
     const indexed = {};
     const amplitudes = {};
+
     ROWS.forEach(({ key }) => {
       const data = (seasonal[key] || []).slice(0, 12);
       const vals = data.map(d => d.value).filter(v => v > 0);
       const avg  = vals.reduce((a, b) => a + b, 0) / (vals.length || 1);
+
       const idxData = data.map(d => ({
         month:    d.month,
         label:    MONTHS[d.month - 1],
@@ -939,45 +941,51 @@ function renderHeroKPIs(scenes) {
       }));
       indexed[key] = idxData;
 
-      const peak   = idxData.reduce((a, b) => a.index > b.index ? a : b);
-      const trough = idxData.reduce((a, b) => a.index < b.index ? a : b);
+      const peak   = idxData.reduce((a, b) => a.value > b.value ? a : b);
+      const trough = idxData.reduce((a, b) => a.value < b.value ? a : b);
+      
+      // 2. Rumus Amplitudo Baru: (Max - Min) / Min * 100
+      const amp = trough.value > 0 ? ((peak.value - trough.value) / trough.value) * 100 : 0;
+
       amplitudes[key] = {
-        peak, trough,
-        amp: peak.index - trough.index  // in index points = %
+        peak, trough, amp,
+        minIdx: trough.index,
+        maxIdx: peak.index
       };
     });
 
-    // Color: neutral at 100, commodity color above, sage-ish below — NO dark/black
-    function cellBg(key, dev) {
+    // Fungsi transisi warna linear dari nilai index terendah ke tertinggi
+    function cellBg(key, index) {
       const row = ROWS.find(r => r.key === key);
-      const t = Math.max(-1, Math.min(1, dev / 8)); // clamp ±8%
-      const from = t >= 0 ? row.colorHigh : row.colorLow;
-      const u = Math.abs(t);
-      const r = Math.round(neutral[0] + u * (from[0] - neutral[0]));
-      const g = Math.round(neutral[1] + u * (from[1] - neutral[1]));
-      const b = Math.round(neutral[2] + u * (from[2] - neutral[2]));
+      const min = amplitudes[key].minIdx;
+      const max = amplitudes[key].maxIdx;
+      
+      // Hitung posisi (t) dari 0 (paling murah) sampai 1 (paling mahal)
+      const range = Math.max(max - min, 1);
+      const t = Math.max(0, Math.min(1, (index - min) / range)); 
+      
+      const r = Math.round(row.colorLow[0] + t * (row.colorHigh[0] - row.colorLow[0]));
+      const g = Math.round(row.colorLow[1] + t * (row.colorHigh[1] - row.colorLow[1]));
+      const b = Math.round(row.colorLow[2] + t * (row.colorHigh[2] - row.colorLow[2]));
       return `rgb(${r},${g},${b})`;
     }
 
-    // Build tooltip div (hidden, absolute)
-    el.innerHTML = `<div id="seas-tooltip" style="
-      display:none;position:fixed;z-index:9999;
-      background:var(--brown);color:var(--white);
-      border-radius:8px;padding:10px 14px;
-      font-family:'DM Sans',sans-serif;font-size:11.5px;
-      box-shadow:0 4px 20px rgba(0,0,0,0.22);
-      pointer-events:none;min-width:180px;line-height:1.7;
-    "></div>`;
+    el.innerHTML = `<div id="seas-tooltip" style="display:none;position:fixed;z-index:9999;background:var(--brown);color:var(--white);border-radius:8px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:11.5px;box-shadow:0 4px 20px rgba(0,0,0,0.22);pointer-events:none;min-width:180px;line-height:1.7;"></div>`;
 
     const headerCells = MONTHS.map(m =>
-      `<th style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text3);
-        font-weight:500;padding:4px 0;text-align:center;min-width:54px;">${m}</th>`
+      `<th style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text3);font-weight:500;padding:4px 0;text-align:center;min-width:54px;">${m}</th>`
     ).join("");
 
     const dataRows = ROWS.map(({ key, label }) => {
       const cells = (indexed[key] || []).map(d => {
-        const bg  = cellBg(key, d.dev);
-        const sign = d.dev >= 0 ? "+" : "";
+        const bg  = cellBg(key, d.index);
+        
+        // 3. Logika warna font: Putih jika intensitas warna (t) sudah melewati setengah jalan
+        const min = amplitudes[key].minIdx;
+        const max = amplitudes[key].maxIdx;
+        const t = Math.max(0, Math.min(1, (d.index - min) / Math.max(max - min, 1)));
+        const txtColor = (t > 0.55) ? "#FFFFFF" : "#2E1F0E"; 
+        
         return `<td
           data-key="${key}"
           data-month="${d.labelID}"
@@ -985,7 +993,7 @@ function renderHeroKPIs(scenes) {
           data-dev="${d.dev.toFixed(2)}"
           data-value="${d.value}"
           data-avg="${Math.round(d.avg)}"
-          style="background:${bg};color:#2E1F0E !important;border-radius:5px;
+          style="background:${bg};color:${txtColor} !important;border-radius:5px;
             text-align:center;padding:11px 4px;
             font-family:'DM Mono',monospace;font-size:11.5px;font-weight:700;
             cursor:default;transition:filter .15s;min-width:54px;"
@@ -995,9 +1003,7 @@ function renderHeroKPIs(scenes) {
       }).join("");
 
       return `<tr>
-        <td style="font-size:11.5px;font-weight:600;color:var(--text2);
-          padding-right:14px;padding-top:3px;padding-bottom:3px;
-          white-space:nowrap;font-family:'DM Sans',sans-serif;">${label}</td>
+        <td style="font-size:11.5px;font-weight:600;color:var(--text2);padding-right:14px;padding-top:3px;padding-bottom:3px;white-space:nowrap;font-family:'DM Sans',sans-serif;">${label}</td>
         ${cells}
       </tr>`;
     }).join("");
@@ -1011,7 +1017,6 @@ function renderHeroKPIs(scenes) {
         Indeks 100 = rata-rata harga tahunan tiap komoditas. Di atas 100 = lebih mahal dari rata-rata.
       </div>`;
 
-    // Tooltip hover handlers
     window._seasHover = function(e, td) {
       const tt = document.getElementById("seas-tooltip");
       if (!tt) return;
@@ -1051,6 +1056,7 @@ function renderHeroKPIs(scenes) {
       tt.style.left = Math.min(rect.left, window.innerWidth - 210) + "px";
       tt.style.top  = (rect.top - tt.offsetHeight - 8) + "px";
     };
+    
     window._seasOut = function() {
       const tt = document.getElementById("seas-tooltip");
       if (tt) tt.style.display = "none";
@@ -1058,7 +1064,6 @@ function renderHeroKPIs(scenes) {
         .forEach(td => td.style.filter = "");
     };
 
-    // Populate KPI cards + insight
     ROWS.forEach(({ key }) => {
       const { peak, trough, amp } = amplitudes[key];
       const sign = amp >= 0 ? "+" : "";
@@ -1067,7 +1072,6 @@ function renderHeroKPIs(scenes) {
       setText(`seas-${key}-amp`,    `${sign}${amp.toFixed(1).replace(".",",")}%`);
     });
 
-    // Dynamic insight text
     const ampSapi  = amplitudes.sapi?.amp  || 0;
     const ampAyam  = amplitudes.ayam?.amp  || 0;
     const ratio    = ampSapi > 0 ? (ampAyam / ampSapi) : 0;
