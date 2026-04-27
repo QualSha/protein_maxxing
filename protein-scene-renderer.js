@@ -114,7 +114,7 @@
   function fmtPct(v) {
     if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
     const sign = Number(v) > 0 ? "+" : "";
-    return sign + Number(v).toFixed(1).replace(".", ",") + "% YoY";
+    return sign + Number(v).toFixed(1).replace(".", ",") + "%";
   }
   function fmtShortRp(v) {
     if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
