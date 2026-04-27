@@ -153,6 +153,10 @@
       "sumatera selatan": "Sumatera Selatan",
       "kepulauan bangka belitung": "Bangka Belitung",
       "bangka belitung": "Bangka Belitung",
+      "papua tengah": "Papua Tengah",
+      "papua selatan": "Papua Selatan",
+      "papua pegunungan": "Papua Pegunungan",
+      "papua barat daya": "Papua Barat Daya",
       "bengkulu": "Bengkulu",
       "lampung": "Lampung",
       "dki jakarta": "DKI Jakarta",
@@ -270,22 +274,13 @@
 
     container.innerHTML = `<div id="leaflet-${commodity}" class="map-leaflet"></div>`;
 
-    const data = {};
+    // Build lookup from processor rows (fallback)
+    const dataFromProcessor = {};
     rows.forEach(r => {
-      data[r.province] = r.value;
+      dataFromProcessor[r.province] = r.value;
     });
 
-    const values = Object.values(data).filter(Boolean);
-    const minV = Math.min(...values);
-    const maxV = Math.max(...values);
-    const rgb = hexToRgb(COLORS[commodity]);
-
-    function colorFor(v) {
-      if (!v) return "rgba(210,200,185,0.55)";
-      const t = (v - minV) / (maxV - minV || 1);
-      const a = 0.18 + t * 0.82;
-      return `rgba(${rgb.r},${rgb.g},${rgb.b},${a.toFixed(2)})`;
-    }
+    const commodityKey = { sapi: "Sapi", ayam: "Ayam", telur: "Telur" }[commodity];
 
     if (leafletMaps[commodity]) {
       leafletMaps[commodity].remove();
@@ -310,15 +305,51 @@
       attribution: "&copy; OpenStreetMap &copy; CARTO"
     }).addTo(map);
 
-    const geoJsonUrl =
-      "https://raw.githubusercontent.com/superpikar/indonesia-geojson/master/indonesia-province-simple.json";
-
-    const res = await fetch(geoJsonUrl);
+    // Use local GeoJSON
+    const res = await fetch("./choropleth_map.geojson");
     const geo = await res.json();
 
-    const layer = L.geoJSON(geo, {
+    // Parse price from GeoJSON property (format "163,304" → 163304)
+    function parsePriceStr(val) {
+      if (val == null || val === "") return null;
+      // Format is Indonesian thousand-separator: "155,182" = 155182
+      return parseFloat(String(val).replace(/,/g, "")) || null;
+    }
+
+    // Build merged data: GeoJSON prices take precedence, fallback to processor
+    const data = {};
+    geo.features.forEach(feature => {
+      const p = feature.properties || {};
+      const name = normalizeProvName(p.PROVINSI || p.Propinsi || p.provinsi || p.name || "");
+      const geoPrice = parsePriceStr(p[commodityKey]);
+      if (geoPrice) {
+        data[name] = geoPrice;
+      } else if (dataFromProcessor[name]) {
+        data[name] = dataFromProcessor[name];
+      }
+    });
+
+    // Fill in processor data for any provinces not in GeoJSON
+    Object.entries(dataFromProcessor).forEach(([prov, val]) => {
+      if (!data[prov]) data[prov] = val;
+    });
+
+    const values = Object.values(data).filter(Boolean);
+    const minV = Math.min(...values);
+    const maxV = Math.max(...values);
+    const rgb = hexToRgb(COLORS[commodity]);
+
+    function colorFor(v) {
+      if (!v) return "rgba(210,200,185,0.55)";
+      const t = (v - minV) / (maxV - minV || 1);
+      const a = 0.18 + t * 0.82;
+      return `rgba(${rgb.r},${rgb.g},${rgb.b},${a.toFixed(2)})`;
+    }
+
+    const geoJsonLayer = L.geoJSON(geo, {
       style: feature => {
-        const name = getFeatureName(feature);
+        const p = feature.properties || {};
+        const name = normalizeProvName(p.PROVINSI || p.Propinsi || p.provinsi || p.name || "");
         const v = data[name];
 
         return {
@@ -330,28 +361,47 @@
         };
       },
       onEachFeature: (feature, layer) => {
-        const name = getFeatureName(feature);
+        const p = feature.properties || {};
+        const name = normalizeProvName(p.PROVINSI || p.Propinsi || p.provinsi || p.name || "");
         const v = data[name];
 
+        // Parse all three commodities from GeoJSON properties
+        const parsePriceStr = val => val != null && val !== "" ? parseFloat(String(val).replace(/,/g, "")) || null : null;
+        const sapiVal  = parsePriceStr(p.Sapi);
+        const ayamVal  = parsePriceStr(p.Ayam);
+        const telurVal = parsePriceStr(p.Telur);
+        const tpak     = p.TPAK != null ? Number(p.TPAK).toFixed(2).replace(".", ",") + "%" : "-";
+        const tpt      = p.TPT  != null ? Number(p.TPT).toFixed(2).replace(".", ",") + "%" : "-";
+
+        const fmtFull = val => val ? "Rp " + Math.round(val).toLocaleString("id-ID") + "/kg" : "Tidak ada data";
+
+        const activeColor = { sapi: "#7FA872", ayam: "#E8B84B", telur: "#E07040" };
+
+        const activeVal = { sapi: sapiVal, ayam: ayamVal, telur: telurVal }[commodity];
         layer.bindTooltip(
           `<div style="font-weight:700;margin-bottom:3px;">${name}</div>
            <div style="font-size:10px;opacity:.55;margin-bottom:5px;">${LABELS[commodity]}</div>
-           <div style="font-family:'DM Mono',monospace;font-size:13px;color:#E8B84B;font-weight:600;">${v ? "Rp " + Math.round(v).toLocaleString("id-ID") + "/kg" : "Tidak ada data"}</div>`,
+           <div style="font-family:'DM Mono',monospace;font-size:13px;color:#E8B84B;font-weight:600;">${fmtFull(activeVal)}</div>`,
           { sticky: true, direction: "top", className: "prot-tooltip" }
         );
 
         layer.on({
-          mouseover: e => e.target.setStyle({
-            weight: 1.5,
-            color: "#5C3D1E",
-            fillOpacity: 1
-          }),
-          mouseout: e => layer.resetStyle(e.target)
+          mouseover: e => {
+            e.target.setStyle({
+              weight: 1.5,
+              color: "#5C3D1E",
+              fillOpacity: 1
+            });
+            e.target.bringToFront();
+          },
+          mouseout: e => {
+            geoJsonLayer.resetStyle(e.target);
+          }
         });
       }
     }).addTo(map);
 
-    const bounds = layer.getBounds();
+    const bounds = geoJsonLayer.getBounds();
     leafletBounds[commodity] = bounds;
     map.fitBounds(bounds, { padding: [8, 8] });
 
@@ -466,6 +516,38 @@
     canvas.addEventListener("mouseleave", () => { ttEl.style.display = "none"; });
   }
 
+  // Parse price string from GeoJSON ("163,304" → 163304)
+  function parseGeoPrice(val) {
+    if (val == null || val === "") return 0;
+    return parseFloat(String(val).replace(/,/g, "")) || 0;
+  }
+
+  // Build top10 and stats from GeoJSON for all commodities
+  async function buildGeoStats() {
+    const res = await fetch("./choropleth_map.geojson");
+    const geo = await res.json();
+    const stats = { sapi: [], ayam: [], telur: [] };
+
+    geo.features.forEach(feat => {
+      const p = feat.properties || {};
+      const name = normalizeProvName(p.PROVINSI || p.Propinsi || p.provinsi || p.name || "");
+      stats.sapi.push({ province: name, value: parseGeoPrice(p.Sapi) });
+      stats.ayam.push({ province: name, value: parseGeoPrice(p.Ayam) });
+      stats.telur.push({ province: name, value: parseGeoPrice(p.Telur) });
+    });
+
+    const result = {};
+    ["sapi", "ayam", "telur"].forEach(key => {
+      const sorted = stats[key].filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+      const top10  = sorted.slice(0, 10);
+      const cheapest = sorted[sorted.length - 1];
+      const mostExpensive = sorted[0];
+      result[key] = { top10, mostExpensive, cheapest, gap: mostExpensive.value - cheapest.value };
+    });
+
+    return result;
+  }
+
   function renderLandscapeVisuals(scenes) {
     const landscape = scenes?.landscape || {};
 
@@ -475,33 +557,123 @@
       ["telur", "map-telur-wrap", "c2c"]
     ];
 
-    pairs.forEach(([key, mapId, chartId]) => {
+    // Render maps immediately (they fetch GeoJSON internally)
+    pairs.forEach(([key, mapId]) => {
       renderMap(mapId, key, landscape[key]?.mapRows || []);
-      renderBarChart(chartId, key, landscape[key]?.top10 || []);
     });
+
+    // Fetch GeoJSON once, build accurate stats, then render bar charts + callout
+    buildGeoStats().then(geoStats => {
+      window._geoStats = geoStats;
+
+      pairs.forEach(([key, , chartId]) => {
+        renderBarChart(chartId, key, geoStats[key].top10);
+      });
+
+      renderLandscapeKPIsFromGeo(geoStats);
+      renderLandscapeCalloutFromGeo(geoStats);
+    });
+  }
+
+  function renderLandscapeKPIsFromGeo(geoStats) {
+    const items = [
+      ["sapi",  "land-sapi-prov",  "land-sapi-price"],
+      ["ayam",  "land-ayam-prov",  "land-ayam-price"],
+      ["telur", "land-telur-prov", "land-telur-price"]
+    ];
+    items.forEach(([key, provId, priceId]) => {
+      const top = geoStats[key]?.mostExpensive;
+      setText(provId, top?.province || "-");
+      setText(priceId, top?.value ? "rata-rata " + fmtRp(top.value) : "-");
+    });
+  }
+
+  function renderLandscapeCalloutFromGeo(geoStats) {
+    const el = document.getElementById("landscape-callout");
+    if (!el) return;
+
+    const fmtRpLocal = v => v ? "Rp " + Math.round(v).toLocaleString("id-ID") + "/kg" : "-";
+
+    const sapiTop    = geoStats.sapi.mostExpensive;
+    const ayamTop    = geoStats.ayam.mostExpensive;
+    const telurTop   = geoStats.telur.mostExpensive;
+    const sapiBot    = geoStats.sapi.cheapest;
+    const ayamBot    = geoStats.ayam.cheapest;
+    const telurBot   = geoStats.telur.cheapest;
+    const sapiGap    = geoStats.sapi.gap;
+    const ayamGap    = geoStats.ayam.gap;
+    const telurGap   = geoStats.telur.gap;
+
+    const sapiGapPct  = Math.round((sapiGap  / sapiTop.value)  * 100);
+    const ayamGapPct  = Math.round((ayamGap  / ayamTop.value)  * 100);
+    const telurGapPct = Math.round((telurGap / telurTop.value) * 100);
+
+    const biggestGap = [
+      { label: "daging sapi",  value: sapiGap,  pct: sapiGapPct,  top: sapiTop,  bot: sapiBot  },
+      { label: "daging ayam",  value: ayamGap,  pct: ayamGapPct,  top: ayamTop,  bot: ayamBot  },
+      { label: "telur ayam",   value: telurGap, pct: telurGapPct, top: telurTop, bot: telurBot  }
+    ].sort((a, b) => b.value - a.value)[0];
+
+    el.innerHTML = `
+      <strong>${sapiTop.province}</strong> menjadi provinsi dengan harga daging sapi tertinggi
+      (${fmtRpLocal(sapiTop.value)}), <strong>${ayamTop.province}</strong> tertinggi untuk daging ayam
+      (${fmtRpLocal(ayamTop.value)}), dan <strong>${telurTop.province}</strong> tertinggi untuk telur ayam
+      (${fmtRpLocal(telurTop.value)}).
+      Gap terbesar terjadi pada <strong>${biggestGap.label}</strong>: selisih
+      <strong>${fmtRpLocal(biggestGap.value)}</strong>
+      antara ${biggestGap.top.province} (${fmtRpLocal(biggestGap.top.value)}) dan
+      ${biggestGap.bot.province} (${fmtRpLocal(biggestGap.bot.value)}),
+      sekitar ${biggestGap.pct}% lebih murah.
+      Ketimpangan ini mencerminkan beban distribusi dan biaya logistik yang berbeda-beda di seluruh kepulauan Indonesia.
+    `;
   }
 
   function renderLandscapeCallout(scenes) {
   const land = scenes?.landscape || {};
 
-  const sapiTop = land.sapi?.mostExpensive?.province || "-";
-  const ayamTop = land.ayam?.mostExpensive?.province || "-";
-  const telurTop = land.telur?.mostExpensive?.province || "-";
+  const sapiTop    = land.sapi?.mostExpensive?.province  || "-";
+  const ayamTop    = land.ayam?.mostExpensive?.province  || "-";
+  const telurTop   = land.telur?.mostExpensive?.province || "-";
 
-  const sapiGap = land.sapi?.gap;
-  const ayamGap = land.ayam?.gap;
-  const telurGap = land.telur?.gap;
+  const sapiTopPrice   = land.sapi?.mostExpensive?.sapi   ?? land.sapi?.mostExpensive?.value   ?? null;
+  const ayamTopPrice   = land.ayam?.mostExpensive?.ayam   ?? land.ayam?.mostExpensive?.value   ?? null;
+  const telurTopPrice  = land.telur?.mostExpensive?.telur ?? land.telur?.mostExpensive?.value  ?? null;
+
+  // Cheapest provinces
+  const sapiBot  = land.sapi?.cheapest?.province  || "-";
+  const ayamBot  = land.ayam?.cheapest?.province  || "-";
+  const telurBot = land.telur?.cheapest?.province || "-";
+
+  const sapiGap   = land.sapi?.gap   ?? null;
+  const ayamGap   = land.ayam?.gap   ?? null;
+  const telurGap  = land.telur?.gap  ?? null;
+
+  // Gap pct relative to top price
+  const sapiGapPct  = sapiTopPrice  && sapiGap   ? Math.round((sapiGap  / sapiTopPrice)  * 100) : null;
+  const ayamGapPct  = ayamTopPrice  && ayamGap   ? Math.round((ayamGap  / ayamTopPrice)  * 100) : null;
+  const telurGapPct = telurTopPrice && telurGap  ? Math.round((telurGap / telurTopPrice)  * 100) : null;
 
   const biggestGap = [
-    { label: "daging sapi", value: sapiGap },
-    { label: "daging ayam", value: ayamGap },
-    { label: "telur ayam", value: telurGap }
+    { label: "daging sapi", value: sapiGap,  pct: sapiGapPct,  top: sapiTop,  bot: sapiBot  },
+    { label: "daging ayam", value: ayamGap,  pct: ayamGapPct,  top: ayamTop,  bot: ayamBot  },
+    { label: "telur ayam",  value: telurGap, pct: telurGapPct, top: telurTop, bot: telurBot  }
   ].sort((a, b) => (b.value || 0) - (a.value || 0))[0];
 
-  setText(
-    "landscape-callout",
-    `${sapiTop} menjadi provinsi dengan harga sapi tertinggi, ${ayamTop} tertinggi untuk daging ayam, dan ${telurTop} tertinggi untuk telur ayam. Gap terbesar terjadi pada ${biggestGap.label}, dengan selisih sekitar ${fmtRp(biggestGap.value)} antara provinsi termurah dan termahal.`
-  );
+  const fmtRpLocal = v => v != null ? "Rp " + Math.round(Number(v)).toLocaleString("id-ID") + "/kg" : "-";
+
+  const el = document.getElementById("landscape-callout");
+  if (!el) return;
+
+  el.innerHTML = `
+    <strong>${sapiTop}</strong> menjadi provinsi dengan harga daging sapi tertinggi 
+    (${fmtRpLocal(sapiTopPrice)}), <strong>${ayamTop}</strong> tertinggi untuk daging ayam 
+    (${fmtRpLocal(ayamTopPrice)}), dan <strong>${telurTop}</strong> tertinggi untuk telur ayam 
+    (${fmtRpLocal(telurTopPrice)}).
+    Gap terbesar terjadi pada <strong>${biggestGap.label}</strong>: selisih sekitar 
+    <strong>${fmtRpLocal(biggestGap.value)}</strong> 
+    ${biggestGap.pct != null ? `(sekitar ${biggestGap.pct}% lebih murah di ${biggestGap.bot} dibanding ${biggestGap.top})` : `antara provinsi termurah dan termahal`}.
+    Ketimpangan ini mencerminkan beban distribusi dan biaya logistik yang berbeda-beda di seluruh kepulauan Indonesia.
+  `;
 }
 
 function renderTrendScene(scenes) {
@@ -732,20 +904,22 @@ function renderHeroKPIs(scenes) {
     const seasonal = scenes?.seasonal?.rows || {};
     const MONTHS     = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
     const MONTHS_ID  = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+    
+    // 1. Skala warna diubah menjadi Linear: Low (Terang) -> High (Pekat)
     const ROWS = [
-      { key: "sapi",  label: "🐄 Sapi",  colorHigh: [90,122,82],   colorLow: [164,210,156] },
-      { key: "ayam",  label: "🍗 Ayam",  colorHigh: [180,120,20],  colorLow: [220,185,110] },
-      { key: "telur", label: "🥚 Telur", colorHigh: [180,65,30],   colorLow: [225,150,120] }
+      { key: "sapi",  label: "🐄 Sapi",  colorHigh: [50,90,40],    colorLow: [230,235,225] },
+      { key: "ayam",  label: "🍗 Ayam",  colorHigh: [190,95,10],   colorLow: [245,230,210] },
+      { key: "telur", label: "🥚 Telur", colorHigh: [180,40,15],   colorLow: [245,220,210] }
     ];
-    const neutral = [237, 229, 212]; // --cream2
 
-    // Build index per komoditas (baseline = mean = 100)
     const indexed = {};
     const amplitudes = {};
+
     ROWS.forEach(({ key }) => {
       const data = (seasonal[key] || []).slice(0, 12);
       const vals = data.map(d => d.value).filter(v => v > 0);
       const avg  = vals.reduce((a, b) => a + b, 0) / (vals.length || 1);
+
       const idxData = data.map(d => ({
         month:    d.month,
         label:    MONTHS[d.month - 1],
@@ -757,45 +931,51 @@ function renderHeroKPIs(scenes) {
       }));
       indexed[key] = idxData;
 
-      const peak   = idxData.reduce((a, b) => a.index > b.index ? a : b);
-      const trough = idxData.reduce((a, b) => a.index < b.index ? a : b);
+      const peak   = idxData.reduce((a, b) => a.value > b.value ? a : b);
+      const trough = idxData.reduce((a, b) => a.value < b.value ? a : b);
+      
+      // 2. Rumus Amplitudo Baru: (Max - Min) / Min * 100
+      const amp = trough.value > 0 ? ((peak.value - trough.value) / trough.value) * 100 : 0;
+
       amplitudes[key] = {
-        peak, trough,
-        amp: peak.index - trough.index  // in index points = %
+        peak, trough, amp,
+        minIdx: trough.index,
+        maxIdx: peak.index
       };
     });
 
-    // Color: neutral at 100, commodity color above, sage-ish below — NO dark/black
-    function cellBg(key, dev) {
+    // Fungsi transisi warna linear dari nilai index terendah ke tertinggi
+    function cellBg(key, index) {
       const row = ROWS.find(r => r.key === key);
-      const t = Math.max(-1, Math.min(1, dev / 8)); // clamp ±8%
-      const from = t >= 0 ? row.colorHigh : row.colorLow;
-      const u = Math.abs(t);
-      const r = Math.round(neutral[0] + u * (from[0] - neutral[0]));
-      const g = Math.round(neutral[1] + u * (from[1] - neutral[1]));
-      const b = Math.round(neutral[2] + u * (from[2] - neutral[2]));
+      const min = amplitudes[key].minIdx;
+      const max = amplitudes[key].maxIdx;
+      
+      // Hitung posisi (t) dari 0 (paling murah) sampai 1 (paling mahal)
+      const range = Math.max(max - min, 1);
+      const t = Math.max(0, Math.min(1, (index - min) / range)); 
+      
+      const r = Math.round(row.colorLow[0] + t * (row.colorHigh[0] - row.colorLow[0]));
+      const g = Math.round(row.colorLow[1] + t * (row.colorHigh[1] - row.colorLow[1]));
+      const b = Math.round(row.colorLow[2] + t * (row.colorHigh[2] - row.colorLow[2]));
       return `rgb(${r},${g},${b})`;
     }
 
-    // Build tooltip div (hidden, absolute)
-    el.innerHTML = `<div id="seas-tooltip" style="
-      display:none;position:fixed;z-index:9999;
-      background:var(--brown);color:var(--white);
-      border-radius:8px;padding:10px 14px;
-      font-family:'DM Sans',sans-serif;font-size:11.5px;
-      box-shadow:0 4px 20px rgba(0,0,0,0.22);
-      pointer-events:none;min-width:180px;line-height:1.7;
-    "></div>`;
+    el.innerHTML = `<div id="seas-tooltip" style="display:none;position:fixed;z-index:9999;background:var(--brown);color:var(--white);border-radius:8px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:11.5px;box-shadow:0 4px 20px rgba(0,0,0,0.22);pointer-events:none;min-width:180px;line-height:1.7;"></div>`;
 
     const headerCells = MONTHS.map(m =>
-      `<th style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text3);
-        font-weight:500;padding:4px 0;text-align:center;min-width:54px;">${m}</th>`
+      `<th style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text3);font-weight:500;padding:4px 0;text-align:center;min-width:54px;">${m}</th>`
     ).join("");
 
     const dataRows = ROWS.map(({ key, label }) => {
       const cells = (indexed[key] || []).map(d => {
-        const bg  = cellBg(key, d.dev);
-        const sign = d.dev >= 0 ? "+" : "";
+        const bg  = cellBg(key, d.index);
+        
+        // 3. Logika warna font: Putih jika intensitas warna (t) sudah melewati setengah jalan
+        const min = amplitudes[key].minIdx;
+        const max = amplitudes[key].maxIdx;
+        const t = Math.max(0, Math.min(1, (d.index - min) / Math.max(max - min, 1)));
+        const txtColor = (t > 0.55) ? "#FFFFFF" : "#2E1F0E"; 
+        
         return `<td
           data-key="${key}"
           data-month="${d.labelID}"
@@ -803,7 +983,7 @@ function renderHeroKPIs(scenes) {
           data-dev="${d.dev.toFixed(2)}"
           data-value="${d.value}"
           data-avg="${Math.round(d.avg)}"
-          style="background:${bg};color:#2E1F0E !important;border-radius:5px;
+          style="background:${bg};color:${txtColor} !important;border-radius:5px;
             text-align:center;padding:11px 4px;
             font-family:'DM Mono',monospace;font-size:11.5px;font-weight:700;
             cursor:default;transition:filter .15s;min-width:54px;"
@@ -813,9 +993,7 @@ function renderHeroKPIs(scenes) {
       }).join("");
 
       return `<tr>
-        <td style="font-size:11.5px;font-weight:600;color:var(--text2);
-          padding-right:14px;padding-top:3px;padding-bottom:3px;
-          white-space:nowrap;font-family:'DM Sans',sans-serif;">${label}</td>
+        <td style="font-size:11.5px;font-weight:600;color:var(--text2);padding-right:14px;padding-top:3px;padding-bottom:3px;white-space:nowrap;font-family:'DM Sans',sans-serif;">${label}</td>
         ${cells}
       </tr>`;
     }).join("");
@@ -829,7 +1007,6 @@ function renderHeroKPIs(scenes) {
         Indeks 100 = rata-rata harga tahunan tiap komoditas. Di atas 100 = lebih mahal dari rata-rata.
       </div>`;
 
-    // Tooltip hover handlers
     window._seasHover = function(e, td) {
       const tt = document.getElementById("seas-tooltip");
       if (!tt) return;
@@ -869,6 +1046,7 @@ function renderHeroKPIs(scenes) {
       tt.style.left = Math.min(rect.left, window.innerWidth - 210) + "px";
       tt.style.top  = (rect.top - tt.offsetHeight - 8) + "px";
     };
+    
     window._seasOut = function() {
       const tt = document.getElementById("seas-tooltip");
       if (tt) tt.style.display = "none";
@@ -876,7 +1054,6 @@ function renderHeroKPIs(scenes) {
         .forEach(td => td.style.filter = "");
     };
 
-    // Populate KPI cards + insight
     ROWS.forEach(({ key }) => {
       const { peak, trough, amp } = amplitudes[key];
       const sign = amp >= 0 ? "+" : "";
@@ -885,7 +1062,6 @@ function renderHeroKPIs(scenes) {
       setText(`seas-${key}-amp`,    `${sign}${amp.toFixed(1).replace(".",",")}%`);
     });
 
-    // Dynamic insight text
     const ampSapi  = amplitudes.sapi?.amp  || 0;
     const ampAyam  = amplitudes.ayam?.amp  || 0;
     const ratio    = ampSapi > 0 ? (ampAyam / ampSapi) : 0;
@@ -1296,13 +1472,24 @@ function renderHeroKPIs(scenes) {
     ].sort((a, b) => b.value - a.value);
 
     // KPI cards -> beban protein per komoditas
-    setText('afford-worst-val',   `${sortedAvg[0].value.toFixed(1).replace(".", ",")}%`);
-    setText('afford-worst-unit',  `${sortedAvg[0].label} — rata-rata nasional`);
-    setText('afford-natavg-val',  `${sortedAvg[1].value.toFixed(1).replace(".", ",")}%`);
-    setText('afford-natavg-unit', `${sortedAvg[1].label} — rata-rata nasional`);
-    setText('afford-best-val',    `${sortedAvg[2].value.toFixed(1).replace(".", ",")}%`);
-    setText('afford-best-unit',   `${sortedAvg[2].label} — rata-rata nasional`);
+    const acuanUMP = 3100000; 
 
+    // Update KPI cards dengan format baru
+    sortedAvg.forEach((item, index) => {
+        const ids = ['afford-worst', 'afford-natavg', 'afford-best'];
+        const prefix = ids[index];
+
+        // HITUNG RUPIAH: (persen / 100 * UMP) / 30 hari
+        const dailyPrice = Math.round((item.value / 100 * acuanUMP) / 30);
+        const monthlyPrice = dailyPrice * 30;
+        const percentage = item.value.toFixed(1).replace(".", ",");
+
+        // ISI KE HTML (Pastikan ID di HTML sudah diganti ke suffix -daily, -desc, -footer)
+        setText(`${prefix}-daily`, `Rp ${dailyPrice.toLocaleString('id-ID')}/hari`);
+        setText(`${prefix}-desc`, `untuk 60g protein ${item.label} · nasional Apr 2026`);
+        setText(`${prefix}-footer`, `Rp ${monthlyPrice.toLocaleString('id-ID')}/bulan · ${percentage}% UMP nasional`);
+    });
+    
     // Bar chart top 10 provinsi
     const c7a = document.getElementById('c7a');
     if (c7a && !chartInstances['c7a']) {
@@ -1416,9 +1603,8 @@ function renderHeroKPIs(scenes) {
     console.log("Renderer jalan:", scenes);
     renderHeroKPIs(scenes);
     renderTrendKPIs(scenes);
-    renderLandscapeKPIs(scenes);
+    // renderLandscapeKPIs & renderLandscapeCallout diganti versi GeoJSON di renderLandscapeVisuals
     renderLandscapeVisuals(scenes);
-    renderLandscapeCallout(scenes);
     renderTrendScene(scenes);
     renderSeasonalHeatmap(scenes);
     renderKetimpangan(scenes);
