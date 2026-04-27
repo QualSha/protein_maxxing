@@ -1711,33 +1711,36 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
         setText(`${prefix}-desc`, `untuk 60g protein ${item.label} · nasional Apr 2026`);
         setText(`${prefix}-footer`, `Rp ${monthlyPrice.toLocaleString('id-ID')}/bulan · ${percentage}% UMP nasional`);
     });
-    
+
     // Bar chart top 10 provinsi
     const c7a = document.getElementById('c7a');
-    if (c7a && !chartInstances['c7a']) {
-        
-        const dataSapi = affLabels.map(prov => {
-            const d = (aff.sapi || []).find(item => item.prov === prov);
-            return d ? d.percentUMP : 44.6; 
-        });
+if (c7a && !chartInstances['c7a']) {
+    
+    // Siapkan data pembanding
+    const dataSapi = affLabels.map(prov => {
+        const d = (aff.sapi || []).find(item => item.prov === prov);
+        return d ? d.percentUMP : 44.6; 
+    });
 
-        const dataAyam = affLabels.map(prov => {
-            const d = (aff.ayam || []).find(item => item.prov === prov);
-            return d ? d.percentUMP : 13.5;
-        });
+    const dataAyam = affLabels.map(prov => {
+        const d = (aff.ayam || []).find(item => item.prov === prov);
+        return d ? d.percentUMP : 13.5;
+    });
 
-        chartInstances['c7a'] = new Chart(c7a, {
+    chartInstances['c7a'] = new Chart(c7a, {
         type: 'bar',
         data: {
             labels: affLabels,
             datasets: [{
                 label: 'Telur Ayam',
                 data: affVals,
+                // SIMPAN DATA PEMBANDING DI SINI (Hidden data)
                 extraSapi: dataSapi,
                 extraAyam: dataAyam,
                 backgroundColor: 'rgba(201,149,42,0.75)',
                 borderWidth: 0, 
                 borderRadius: 4,
+                // KONTROL GENDUT (Karena cuma 1 dataset, pasti manjur)
                 barPercentage: 0.85,      
                 categoryPercentage: 0.9,
             }]
@@ -1775,7 +1778,7 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
             }
         }
     });
-    } 
+} 
   }
 
   /* FORECAST */
