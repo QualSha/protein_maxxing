@@ -1,0 +1,1341 @@
+/* protein-scene-renderer.js */
+
+(function (global) {
+  "use strict";
+
+  const COLORS = {
+    sapi: "#5A7A52",
+    ayam: "#C9952A",
+    telur: "#C4522A"
+  };
+
+  const LABELS = {
+    sapi: "Daging Sapi",
+    ayam: "Daging Ayam",
+    telur: "Telur Ayam"
+  };
+  const PROVINCE_ISLAND = {
+    "Aceh": "Sumatera",
+    "Sumatera Utara": "Sumatera",
+    "Sumatera Barat": "Sumatera",
+    "Riau": "Sumatera",
+    "Kepulauan Riau": "Sumatera",
+    "Jambi": "Sumatera",
+    "Sumatera Selatan": "Sumatera",
+    "Bangka Belitung": "Sumatera",
+    "Bengkulu": "Sumatera",
+    "Lampung": "Sumatera",
+    "DKI Jakarta": "Jawa",
+    "Jawa Barat": "Jawa",
+    "Banten": "Jawa",
+    "Jawa Tengah": "Jawa",
+    "DI Yogyakarta": "Jawa",
+    "Jawa Timur": "Jawa",
+    "Bali": "Bali & Nusa",
+    "Nusa Tenggara Barat": "Bali & Nusa",
+    "Nusa Tenggara Timur": "Bali & Nusa",
+    "Kalimantan Barat": "Kalimantan",
+    "Kalimantan Tengah": "Kalimantan",
+    "Kalimantan Selatan": "Kalimantan",
+    "Kalimantan Timur": "Kalimantan",
+    "Kalimantan Utara": "Kalimantan",
+    "Sulawesi Utara": "Sulawesi",
+    "Gorontalo": "Sulawesi",
+    "Sulawesi Tengah": "Sulawesi",
+    "Sulawesi Barat": "Sulawesi",
+    "Sulawesi Selatan": "Sulawesi",
+    "Sulawesi Tenggara": "Sulawesi",
+    "Maluku": "Maluku & Papua",
+    "Maluku Utara": "Maluku & Papua",
+    "Papua Barat": "Maluku & Papua",
+    "Papua": "Maluku & Papua"
+  };
+  const ISLAND_COLORS = {
+    "Sumatera": "#C4522A",
+    "Jawa": "#C9952A",
+    "Bali & Nusa": "#A3783F",
+    "Kalimantan": "#5A7A52",
+    "Sulawesi": "#7FA872",
+    "Maluku & Papua": "#7A5230",
+    "Lainnya": "#9A8060"
+  };
+
+  const leafletMaps = {};
+  const leafletBounds = {};
+  const chartInstances = {};
+
+  // ── Shared custom tooltip (dark brown card, gold value) ──────────────────
+  function makeCustomTooltip(id) {
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement("div");
+      el.id = id;
+      el.style.cssText = `
+        display:none;position:fixed;z-index:9999;
+        background:#5C3D1E;color:#FDFAF4;
+        border-radius:8px;padding:9px 14px;
+        font-family:'DM Sans',sans-serif;font-size:11.5px;
+        box-shadow:0 4px 20px rgba(0,0,0,0.22);
+        pointer-events:none;min-width:150px;line-height:1.7;
+      `;
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
+  function positionTooltip(el, chartCanvas, caretX, caretY) {
+    const pos = chartCanvas.getBoundingClientRect();
+    const x = pos.left + caretX;
+    const y = pos.top  + caretY;
+    el.style.left = Math.min(x + 14, window.innerWidth - 220) + "px";
+    el.style.top  = Math.max(y - el.offsetHeight / 2, 8) + "px";
+  }
+
+  function externalTooltipFactory(ttEl, buildHtml) {
+    return function(context) {
+      const { chart, tooltip } = context;
+      if (tooltip.opacity === 0) { ttEl.style.display = "none"; return; }
+      ttEl.innerHTML = buildHtml(tooltip);
+      ttEl.style.display = "block";
+      positionTooltip(ttEl, chart.canvas, tooltip.caretX, tooltip.caretY);
+    };
+  }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function fmtRp(v) {
+    if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
+    return "Rp " + Math.round(Number(v)).toLocaleString("id-ID") + "/kg";
+  }
+
+  function fmtPct(v) {
+    if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
+    const sign = Number(v) > 0 ? "+" : "";
+    return sign + Number(v).toFixed(1).replace(".", ",") + "%";
+  }
+  function fmtShortRp(v) {
+    if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
+    const n = Number(v);
+    if (n >= 1e6) return "Rp" + (n / 1e6).toFixed(1).replace(".", ",") + "jt";
+    return "Rp" + Math.round(n / 1000).toLocaleString("id-ID") + "rb";
+  }
+  function mean(arr) {
+    const values = (arr || []).map(Number).filter(v => Number.isFinite(v));
+    if (!values.length) return null;
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  }
+
+  function hexToRgb(hex) {
+    return {
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16)
+    };
+  }
+
+  function normalizeProvName(raw) {
+    const s = String(raw || "")
+      .replace(/^Provinsi\s+/i, "")
+      .replace(/D\.I\.\s*/i, "DI ")
+      .trim()
+      .toLowerCase();
+
+    const aliases = {
+      "aceh": "Aceh",
+      "sumatera utara": "Sumatera Utara",
+      "sumatera barat": "Sumatera Barat",
+      "riau": "Riau",
+      "kepulauan riau": "Kepulauan Riau",
+      "jambi": "Jambi",
+      "sumatera selatan": "Sumatera Selatan",
+      "kepulauan bangka belitung": "Bangka Belitung",
+      "bangka belitung": "Bangka Belitung",
+      "bengkulu": "Bengkulu",
+      "lampung": "Lampung",
+      "dki jakarta": "DKI Jakarta",
+      "jakarta raya": "DKI Jakarta",
+      "jawa barat": "Jawa Barat",
+      "banten": "Banten",
+      "jawa tengah": "Jawa Tengah",
+      "di yogyakarta": "DI Yogyakarta",
+      "daerah istimewa yogyakarta": "DI Yogyakarta",
+      "yogyakarta": "DI Yogyakarta",
+      "jawa timur": "Jawa Timur",
+      "bali": "Bali",
+      "nusa tenggara barat": "Nusa Tenggara Barat",
+      "nusa tenggara timur": "Nusa Tenggara Timur",
+      "kalimantan barat": "Kalimantan Barat",
+      "kalimantan tengah": "Kalimantan Tengah",
+      "kalimantan selatan": "Kalimantan Selatan",
+      "kalimantan timur": "Kalimantan Timur",
+      "kalimantan utara": "Kalimantan Utara",
+      "sulawesi utara": "Sulawesi Utara",
+      "gorontalo": "Gorontalo",
+      "sulawesi tengah": "Sulawesi Tengah",
+      "sulawesi barat": "Sulawesi Barat",
+      "sulawesi selatan": "Sulawesi Selatan",
+      "sulawesi tenggara": "Sulawesi Tenggara",
+      "maluku": "Maluku",
+      "maluku utara": "Maluku Utara",
+      "papua barat": "Papua Barat",
+      "papua": "Papua"
+    };
+
+    return aliases[s] || raw;
+  }
+
+  function getFeatureName(feature) {
+    const p = feature.properties || {};
+    return normalizeProvName(
+      p.Propinsi || p.provinsi || p.PROVINSI || p.name || p.NAME_1 || p.NAME || p.state || ""
+    );
+  }
+
+  function renderTrendKPIs(scenes) {
+    const events = scenes?.trend?.events || {};
+    const monthly = scenes?.trend?.monthly || [];
+    const datasets = scenes?.trend?.datasets || [];
+
+    const COLOR = { sapi: "#5A7A52", ayam: "#C9952A", telur: "#C4522A" };
+    const LABEL = { sapi: "Daging Sapi", ayam: "Daging Ayam", telur: "Telur Ayam" };
+
+    // --- KPI 1: Lonjakan bulanan terbesar (semua komoditas) ---
+    const jumpCandidates = Object.entries(events)
+      .map(([key, val]) => ({ key, pct: val?.maxMonthlyJump?.pct, from: val?.maxMonthlyJump?.from, to: val?.maxMonthlyJump?.to }))
+      .filter(d => d.pct != null);
+    const maxJump = jumpCandidates.sort((a, b) => b.pct - a.pct)[0];
+
+    setText("trend-max-jump", fmtPct(maxJump?.pct));
+    setText("trend-max-jump-unit", maxJump
+      ? `${LABEL[maxJump.key]}, ${formatMonthLabel(maxJump.from)} → ${formatMonthLabel(maxJump.to)}`
+      : "-");
+    const accentJump = document.getElementById("kpi-accent-jump");
+    if (accentJump && maxJump) accentJump.style.background = COLOR[maxJump.key];
+
+    // --- KPI 2: Kenaikan kumulatif tertinggi ---
+    const cumulCandidates = Object.entries(events)
+      .map(([key, val]) => ({ key, pct: val?.cumulativePct }))
+      .filter(d => d.pct != null);
+    const maxCumul = cumulCandidates.sort((a, b) => b.pct - a.pct)[0];
+
+    setText("trend-cumulative", fmtPct(maxCumul?.pct));
+    setText("trend-cumulative-unit", maxCumul
+      ? `${LABEL[maxCumul.key]}, awal data vs akhir data`
+      : "-");
+    const accentCumul = document.getElementById("kpi-accent-cumulative");
+    if (accentCumul && maxCumul) accentCumul.style.background = COLOR[maxCumul.key];
+
+    // --- KPI 3: Paling stabil (range persen terkecil) ---
+    const stableCandidates = datasets.map(ds => {
+      const vals = ds.data.filter(v => v != null && v > 0);
+      if (!vals.length) return null;
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const rangePct = ((Math.max(...vals) - Math.min(...vals)) / avg) * 100;
+      return { key: ds.key, rangePct };
+    }).filter(Boolean);
+    const mostStable = stableCandidates.sort((a, b) => a.rangePct - b.rangePct)[0];
+
+    setText("trend-stable", LABEL[mostStable?.key] || "-");
+    setText("trend-stable-unit", mostStable
+      ? `Range harga relatif: ${fmtPct(mostStable.rangePct)}`
+      : "-");
+    const accentStable = document.getElementById("kpi-accent-stable");
+    if (accentStable && mostStable) accentStable.style.background = COLOR[mostStable.key];
+  }
+
+  function renderLandscapeKPIs(scenes) {
+    const landscape = scenes?.landscape || {};
+
+    const items = [
+      ["sapi", "land-sapi-prov", "land-sapi-price"],
+      ["ayam", "land-ayam-prov", "land-ayam-price"],
+      ["telur", "land-telur-prov", "land-telur-price"]
+    ];
+
+    items.forEach(([key, provId, priceId]) => {
+      const top = landscape[key]?.mostExpensive;
+      const price = top?.[key] ?? top?.value ?? null;
+
+      setText(provId, top?.province || "-");
+      setText(priceId, price ? "rata-rata " + fmtRp(price) : "-");
+    });
+  }
+
+  async function renderMap(containerId, commodity, rows) {
+    const container = document.getElementById(containerId);
+    if (!container || !global.L) return;
+
+    container.innerHTML = `<div id="leaflet-${commodity}" class="map-leaflet"></div>`;
+
+    const data = {};
+    rows.forEach(r => {
+      data[r.province] = r.value;
+    });
+
+    const values = Object.values(data).filter(Boolean);
+    const minV = Math.min(...values);
+    const maxV = Math.max(...values);
+    const rgb = hexToRgb(COLORS[commodity]);
+
+    function colorFor(v) {
+      if (!v) return "rgba(210,200,185,0.55)";
+      const t = (v - minV) / (maxV - minV || 1);
+      const a = 0.18 + t * 0.82;
+      return `rgba(${rgb.r},${rgb.g},${rgb.b},${a.toFixed(2)})`;
+    }
+
+    if (leafletMaps[commodity]) {
+      leafletMaps[commodity].remove();
+    }
+
+    const map = L.map(`leaflet-${commodity}`, {
+      zoomControl: true,
+      attributionControl: true,
+      scrollWheelZoom: false,
+      dragging: true,
+      doubleClickZoom: false,
+      boxZoom: false,
+      keyboard: false
+    }).setView([-2.4, 118], 4);
+
+    leafletMaps[commodity] = map;
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+      maxZoom: 7,
+      minZoom: 4,
+      opacity: 0.55,
+      attribution: "&copy; OpenStreetMap &copy; CARTO"
+    }).addTo(map);
+
+    const geoJsonUrl =
+      "https://raw.githubusercontent.com/superpikar/indonesia-geojson/master/indonesia-province-simple.json";
+
+    const res = await fetch(geoJsonUrl);
+    const geo = await res.json();
+
+    const layer = L.geoJSON(geo, {
+      style: feature => {
+        const name = getFeatureName(feature);
+        const v = data[name];
+
+        return {
+          fillColor: colorFor(v),
+          fillOpacity: 0.92,
+          color: "#FDFAF4",
+          weight: 0.75,
+          opacity: 1
+        };
+      },
+      onEachFeature: (feature, layer) => {
+        const name = getFeatureName(feature);
+        const v = data[name];
+
+        layer.bindTooltip(
+          `<div style="font-weight:700;margin-bottom:3px;">${name}</div>
+           <div style="font-size:10px;opacity:.55;margin-bottom:5px;">${LABELS[commodity]}</div>
+           <div style="font-family:'DM Mono',monospace;font-size:13px;color:#E8B84B;font-weight:600;">${v ? "Rp " + Math.round(v).toLocaleString("id-ID") + "/kg" : "Tidak ada data"}</div>`,
+          { sticky: true, direction: "top", className: "prot-tooltip" }
+        );
+
+        layer.on({
+          mouseover: e => e.target.setStyle({
+            weight: 1.5,
+            color: "#5C3D1E",
+            fillOpacity: 1
+          }),
+          mouseout: e => layer.resetStyle(e.target)
+        });
+      }
+    }).addTo(map);
+
+    const bounds = layer.getBounds();
+    leafletBounds[commodity] = bounds;
+    map.fitBounds(bounds, { padding: [8, 8] });
+
+    // Expose so switchTab can access
+    window.leafletMaps = leafletMaps;
+    window.leafletBounds = leafletBounds;
+
+    setTimeout(() => {
+      map.invalidateSize(false);
+      map.fitBounds(bounds, { padding: [8, 8], animate: false });
+    }, 250);
+  }
+
+  function renderBarChart(canvasId, commodity, top10) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !global.Chart) return;
+
+    if (chartInstances[canvasId]) {
+      chartInstances[canvasId].destroy();
+    }
+
+    const labels = top10.map(d => d.province);
+    const values = top10.map(d => d.value);
+    const labelMap = { sapi: "Daging Sapi", ayam: "Daging Ayam", telur: "Telur Ayam" };
+
+    // Shared custom tooltip element per chart
+    let ttEl = document.getElementById("bar-tooltip-" + canvasId);
+    if (!ttEl) {
+      ttEl = document.createElement("div");
+      ttEl.id = "bar-tooltip-" + canvasId;
+      ttEl.style.cssText = `
+        display:none;position:fixed;z-index:9999;
+        background:#5C3D1E;color:#FDFAF4;
+        border-radius:8px;padding:9px 13px;
+        font-family:'DM Sans',sans-serif;font-size:11.5px;
+        box-shadow:0 4px 18px rgba(0,0,0,0.22);
+        pointer-events:none;min-width:160px;line-height:1.65;
+      `;
+      document.body.appendChild(ttEl);
+    }
+
+    const externalTooltip = (context) => {
+      const { chart, tooltip } = context;
+      if (tooltip.opacity === 0) { ttEl.style.display = "none"; return; }
+
+      const province = tooltip.dataPoints?.[0]?.label || "";
+      const value    = tooltip.dataPoints?.[0]?.raw    || 0;
+      const rank     = tooltip.dataPoints?.[0]?.dataIndex + 1;
+
+      ttEl.innerHTML = `
+        <div style="font-weight:700;margin-bottom:3px;">${province}</div>
+        <div style="font-size:10px;opacity:.55;margin-bottom:5px;">${labelMap[commodity]} · Peringkat #${rank}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:13px;color:#E8B84B;font-weight:600;">
+          Rp ${Math.round(value).toLocaleString("id-ID")}/kg
+        </div>`;
+
+      ttEl.style.display = "block";
+      const pos = chart.canvas.getBoundingClientRect();
+      const x = pos.left + tooltip.caretX;
+      const y = pos.top  + tooltip.caretY;
+      ttEl.style.left = Math.min(x + 12, window.innerWidth - 200) + "px";
+      ttEl.style.top  = (y - ttEl.offsetHeight / 2) + "px";
+    };
+
+    chartInstances[canvasId] = new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: values.map((_, i) =>
+            i < 3 ? COLORS[commodity] : COLORS[commodity] + "55"
+          ),
+          borderWidth: 0,
+          borderRadius: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: "y",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: false,
+            external: externalTooltip
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: "#9A8060",
+              font: { family: "DM Sans", size: 9 },
+              callback: v => "Rp" + (v / 1000).toFixed(0) + "rb"
+            },
+            grid: { color: "rgba(92,61,30,0.055)" },
+            border: { color: "transparent" }
+          },
+          y: {
+            ticks: {
+              color: "#9A8060",
+              font: { family: "DM Sans", size: 9 }
+            },
+            grid: { color: "transparent" },
+            border: { color: "transparent" }
+          }
+        }
+      }
+    });
+
+    // Hide tooltip when mouse leaves chart
+    canvas.addEventListener("mouseleave", () => { ttEl.style.display = "none"; });
+  }
+
+  function renderLandscapeVisuals(scenes) {
+    const landscape = scenes?.landscape || {};
+
+    const pairs = [
+      ["sapi", "map-sapi-wrap", "c2a"],
+      ["ayam", "map-ayam-wrap", "c2b"],
+      ["telur", "map-telur-wrap", "c2c"]
+    ];
+
+    pairs.forEach(([key, mapId, chartId]) => {
+      renderMap(mapId, key, landscape[key]?.mapRows || []);
+      renderBarChart(chartId, key, landscape[key]?.top10 || []);
+    });
+  }
+
+  function renderLandscapeCallout(scenes) {
+  const land = scenes?.landscape || {};
+
+  const sapiTop = land.sapi?.mostExpensive?.province || "-";
+  const ayamTop = land.ayam?.mostExpensive?.province || "-";
+  const telurTop = land.telur?.mostExpensive?.province || "-";
+
+  const sapiGap = land.sapi?.gap;
+  const ayamGap = land.ayam?.gap;
+  const telurGap = land.telur?.gap;
+
+  const biggestGap = [
+    { label: "daging sapi", value: sapiGap },
+    { label: "daging ayam", value: ayamGap },
+    { label: "telur ayam", value: telurGap }
+  ].sort((a, b) => (b.value || 0) - (a.value || 0))[0];
+
+  setText(
+    "landscape-callout",
+    `${sapiTop} menjadi provinsi dengan harga sapi tertinggi, ${ayamTop} tertinggi untuk daging ayam, dan ${telurTop} tertinggi untuk telur ayam. Gap terbesar terjadi pada ${biggestGap.label}, dengan selisih sekitar ${fmtRp(biggestGap.value)} antara provinsi termurah dan termahal.`
+  );
+}
+
+function renderTrendScene(scenes) {
+  const monthly = scenes?.trend?.monthly || [];
+  const events = scenes?.trend?.events || {};
+
+  const labels = monthly.map(d => d.label);
+
+  const datasets = [
+    { key: "sapi",  label: "Daging Sapi", data: monthly.map(d => d.sapi),  color: "#5A7A52" },
+    { key: "ayam",  label: "Daging Ayam", data: monthly.map(d => d.ayam),  color: "#C9952A" },
+    { key: "telur", label: "Telur Ayam",  data: monthly.map(d => d.telur), color: "#C4522A" }
+  ];
+
+  // Chart tren nasional
+  renderTrendChart(labels, datasets);
+
+  // Event list otomatis
+  renderTrendEventListAuto(scenes);
+}
+
+function renderTrendChart(labels, datasets) {
+  const canvas = document.getElementById("c3a");
+  if (!canvas || !window.Chart) return;
+
+  if (chartInstances["c3a"]) chartInstances["c3a"].destroy();
+
+  const ttTrend = makeCustomTooltip("tt-trend");
+
+  chartInstances["c3a"] = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: datasets.map(ds => ({
+        label: ds.label,
+        data: ds.data,
+        borderColor: ds.color,
+        backgroundColor: ds.color + "22",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: true
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          mode: "index",
+          intersect: false,
+          external: externalTooltipFactory(ttTrend, (tt) => {
+            const label = tt.dataPoints?.[0]?.label || "";
+            const rows = tt.dataPoints
+              .filter(p => p.parsed.y !== null)
+              .map(p => `
+                <div style="display:flex;justify-content:space-between;gap:20px;align-items:center;margin-top:4px;">
+                  <span style="display:flex;align-items:center;gap:6px;font-size:10.5px;opacity:.85;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:${p.dataset.borderColor};display:inline-block;flex-shrink:0;"></span>
+                    ${p.dataset.label}
+                  </span>
+                  <strong style="font-family:'DM Mono',monospace;font-size:12px;color:#E8B84B;">
+                    Rp ${Math.round(p.parsed.y).toLocaleString("id-ID")}
+                  </strong>
+                </div>`).join("");
+            return `<div style="font-weight:700;font-size:12px;margin-bottom:4px;">${label}</div>${rows}`;
+          })
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#9A8060", font: { family: "DM Sans", size: 8.5 }, maxTicksLimit: 14, maxRotation: 0 },
+          grid: { color: "rgba(92,61,30,0.055)" }, border: { color: "transparent" }
+        },
+        y: {
+          ticks: { color: "#9A8060", font: { family: "DM Sans", size: 9 }, callback: v => "Rp" + (v/1000).toFixed(0) + "rb" },
+          grid: { color: "rgba(92,61,30,0.055)" }, border: { color: "transparent" }
+        }
+      }
+    }
+  });
+
+  canvas.addEventListener("mouseleave", () => { ttTrend.style.display = "none"; });
+}
+
+function renderTrendEventList(maxJump, maxCumulative, mostStable, events) {
+  const el = document.getElementById("trend-event-list");
+  if (!el) return;
+
+  const items = [];
+
+  if (maxJump) {
+    items.push({
+      date: `${maxJump.from} → ${maxJump.to}`,
+      desc: `${maxJump.label} mengalami lonjakan bulanan paling tajam sebesar ${fmtPct(maxJump.pct)}.`
+    });
+  }
+
+  if (maxCumulative) {
+    items.push({
+      date: "Awal → Akhir",
+      desc: `${maxCumulative.label} mencatat kenaikan kumulatif tertinggi sebesar ${fmtPct(maxCumulative.pct)} sepanjang periode data.`
+    });
+  }
+
+  if (events.sapi?.cumulativePct !== undefined) {
+    items.push({
+      date: "Sapi",
+      desc: `Harga sapi bergerak ${fmtPct(events.sapi.cumulativePct)} dari awal sampai akhir periode.`
+    });
+  }
+
+  if (events.ayam?.cumulativePct !== undefined) {
+    items.push({
+      date: "Ayam",
+      desc: `Harga ayam bergerak ${fmtPct(events.ayam.cumulativePct)} dari awal sampai akhir periode.`
+    });
+  }
+
+  if (events.telur?.cumulativePct !== undefined) {
+    items.push({
+      date: "Telur",
+      desc: `Harga telur bergerak ${fmtPct(events.telur.cumulativePct)} dari awal sampai akhir periode.`
+    });
+  }
+
+  if (mostStable) {
+    items.push({
+      date: "Stabilitas",
+      desc: `${mostStable.label} menjadi komoditas paling stabil berdasarkan range harga relatif.`
+    });
+  }
+
+  el.innerHTML = items.map(item => `
+    <div class="event-item">
+      <span class="event-date">${item.date}</span>
+      <span class="event-desc">${item.desc}</span>
+    </div>
+  `).join("");
+}
+
+function formatMonthLabel(monthStr) {
+  if (!monthStr) return "-";
+  const [y, m] = monthStr.split("-");
+  const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  return `${months[Number(m) - 1]} ${y}`;
+}
+
+function renderTrendEventListAuto(scenes) {
+  const el = document.getElementById("trend-event-list");
+  if (!el) return;
+
+  const events = scenes?.trend?.events || {};
+  const monthly = scenes?.trend?.monthly || [];
+
+  const LABEL = { sapi: "Daging sapi", ayam: "Daging ayam", telur: "Telur ayam" };
+  const COLOR = { sapi: "var(--sapi)", ayam: "var(--ayam)", telur: "var(--telur)" };
+
+  const lines = [];
+
+  // 1. Lonjakan bulanan terbesar tiap komoditas
+  Object.entries(events).forEach(([key, e]) => {
+    const jump = e?.maxMonthlyJump;
+    if (!jump?.pct) return;
+    const range = `${formatMonthLabel(jump.from)}–${formatMonthLabel(jump.to)}`;
+    lines.push({
+      key,
+      html: `<span style="font-weight:700;color:var(--brown);font-family:'DM Mono',monospace;font-size:11.5px;">${range}:</span> ${LABEL[key]} mencatat lonjakan tertinggi (<strong style="color:${COLOR[key]};">${fmtPct(jump.pct)}</strong>)`
+    });
+  });
+
+  // 2. Kenaikan kumulatif tiap komoditas
+  Object.entries(events).forEach(([key, e]) => {
+    if (e?.cumulativePct == null) return;
+    const first = monthly[0]?.label;
+    const last = monthly.at(-1)?.label;
+    lines.push({
+      key,
+      html: `<span style="font-weight:700;color:var(--brown);font-family:'DM Mono',monospace;font-size:11.5px;">${first}–${last}:</span> ${LABEL[key]} naik kumulatif sebesar <strong style="color:${COLOR[key]};">${fmtPct(e.cumulativePct)}</strong> sepanjang periode`
+    });
+  });
+
+  // 3. Harga tertinggi periode akhir
+  const latest = monthly.at(-1);
+  if (latest) {
+    const highest = ["sapi", "ayam", "telur"]
+      .map(k => ({ key: k, value: latest[k] }))
+      .sort((a, b) => b.value - a.value)[0];
+    lines.push({
+      key: highest.key,
+      html: `<span style="font-weight:700;color:var(--brown);font-family:'DM Mono',monospace;font-size:11.5px;">${scenes.meta?.latestLabel || latest.label}:</span> ${LABEL[highest.key]} menjadi yang termahal secara nasional (<strong style="color:${COLOR[highest.key]};">${fmtRp(highest.value)}</strong>)`
+    });
+  }
+
+  el.innerHTML = lines.slice(0, 7).map(line => `
+    <div style="padding:9px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--text2);line-height:1.6;">
+      ${line.html}
+    </div>
+  `).join("").replace(/border-bottom:[^;]+;([^"]*)"([^"]*last-child)/, '');
+
+  // remove border on last item
+  const divs = el.querySelectorAll("div");
+  if (divs.length) divs[divs.length - 1].style.borderBottom = "none";
+}
+
+function fmtRpNumber(v) {
+  if (v == null || isNaN(Number(v))) return "-";
+  return Math.round(Number(v)).toLocaleString("id-ID");
+}
+function renderHeroKPIs(scenes) {
+  const hero = scenes?.hero || [];
+
+  hero.forEach(item => {
+    const key = item.key; // sapi / ayam / telur
+
+    setText(`hero-${key}-val`, fmtRpNumber(item.value));
+    setText(`hero-${key}-sub`, `${item.unit} · nasional ${scenes.meta?.latestLabel || item.month}`);
+    setText(`hero-${key}-yoy`, fmtPct(item.yoyPct));
+  });
+}
+
+  function renderSeasonalHeatmap(scenes) {
+    const el = document.getElementById("heatmap-wrap");
+    if (!el) return;
+
+    const seasonal = scenes?.seasonal?.rows || {};
+    const MONTHS     = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+    const MONTHS_ID  = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+    const ROWS = [
+      { key: "sapi",  label: "🐄 Sapi",  colorHigh: [90,122,82],   colorLow: [164,210,156] },
+      { key: "ayam",  label: "🍗 Ayam",  colorHigh: [180,120,20],  colorLow: [220,185,110] },
+      { key: "telur", label: "🥚 Telur", colorHigh: [180,65,30],   colorLow: [225,150,120] }
+    ];
+    const neutral = [237, 229, 212]; // --cream2
+
+    // Build index per komoditas (baseline = mean = 100)
+    const indexed = {};
+    const amplitudes = {};
+    ROWS.forEach(({ key }) => {
+      const data = (seasonal[key] || []).slice(0, 12);
+      const vals = data.map(d => d.value).filter(v => v > 0);
+      const avg  = vals.reduce((a, b) => a + b, 0) / (vals.length || 1);
+      const idxData = data.map(d => ({
+        month:    d.month,
+        label:    MONTHS[d.month - 1],
+        labelID:  MONTHS_ID[d.month - 1],
+        value:    d.value,
+        avg,
+        index:    avg > 0 ? Math.round((d.value / avg) * 100) : 100,
+        dev:      avg > 0 ? ((d.value / avg) - 1) * 100 : 0
+      }));
+      indexed[key] = idxData;
+
+      const peak   = idxData.reduce((a, b) => a.index > b.index ? a : b);
+      const trough = idxData.reduce((a, b) => a.index < b.index ? a : b);
+      amplitudes[key] = {
+        peak, trough,
+        amp: peak.index - trough.index  // in index points = %
+      };
+    });
+
+    // Color: neutral at 100, commodity color above, sage-ish below — NO dark/black
+    function cellBg(key, dev) {
+      const row = ROWS.find(r => r.key === key);
+      const t = Math.max(-1, Math.min(1, dev / 8)); // clamp ±8%
+      const from = t >= 0 ? row.colorHigh : row.colorLow;
+      const u = Math.abs(t);
+      const r = Math.round(neutral[0] + u * (from[0] - neutral[0]));
+      const g = Math.round(neutral[1] + u * (from[1] - neutral[1]));
+      const b = Math.round(neutral[2] + u * (from[2] - neutral[2]));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    // Build tooltip div (hidden, absolute)
+    el.innerHTML = `<div id="seas-tooltip" style="
+      display:none;position:fixed;z-index:9999;
+      background:var(--brown);color:var(--white);
+      border-radius:8px;padding:10px 14px;
+      font-family:'DM Sans',sans-serif;font-size:11.5px;
+      box-shadow:0 4px 20px rgba(0,0,0,0.22);
+      pointer-events:none;min-width:180px;line-height:1.7;
+    "></div>`;
+
+    const headerCells = MONTHS.map(m =>
+      `<th style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text3);
+        font-weight:500;padding:4px 0;text-align:center;min-width:54px;">${m}</th>`
+    ).join("");
+
+    const dataRows = ROWS.map(({ key, label }) => {
+      const cells = (indexed[key] || []).map(d => {
+        const bg  = cellBg(key, d.dev);
+        const sign = d.dev >= 0 ? "+" : "";
+        return `<td
+          data-key="${key}"
+          data-month="${d.labelID}"
+          data-index="${d.index}"
+          data-dev="${d.dev.toFixed(2)}"
+          data-value="${d.value}"
+          data-avg="${Math.round(d.avg)}"
+          style="background:${bg};color:#2E1F0E !important;border-radius:5px;
+            text-align:center;padding:11px 4px;
+            font-family:'DM Mono',monospace;font-size:11.5px;font-weight:700;
+            cursor:default;transition:filter .15s;min-width:54px;"
+          onmouseover="window._seasHover(event,this)"
+          onmouseout="window._seasOut()"
+        >${d.index}</td>`;
+      }).join("");
+
+      return `<tr>
+        <td style="font-size:11.5px;font-weight:600;color:var(--text2);
+          padding-right:14px;padding-top:3px;padding-bottom:3px;
+          white-space:nowrap;font-family:'DM Sans',sans-serif;">${label}</td>
+        ${cells}
+      </tr>`;
+    }).join("");
+
+    el.innerHTML += `
+      <table style="border-collapse:separate;border-spacing:3px;width:100%;">
+        <thead><tr><th style="min-width:72px;"></th>${headerCells}</tr></thead>
+        <tbody>${dataRows}</tbody>
+      </table>
+      <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);">
+        Indeks 100 = rata-rata harga tahunan tiap komoditas. Di atas 100 = lebih mahal dari rata-rata.
+      </div>`;
+
+    // Tooltip hover handlers
+    window._seasHover = function(e, td) {
+      const tt = document.getElementById("seas-tooltip");
+      if (!tt) return;
+      const key   = td.dataset.key;
+      const month = td.dataset.month;
+      const index = Number(td.dataset.index);
+      const dev   = Number(td.dataset.dev);
+      const value = Number(td.dataset.value);
+      const avg   = Number(td.dataset.avg);
+      const sign  = dev >= 0 ? "+" : "";
+      const label = { sapi:"Daging Sapi", ayam:"Daging Ayam", telur:"Telur Ayam" }[key];
+
+      tt.innerHTML = `
+        <div style="font-weight:700;margin-bottom:4px;">${month}</div>
+        <div style="font-size:10px;opacity:.65;margin-bottom:6px;">${label}</div>
+        <div style="display:flex;justify-content:space-between;gap:16px;">
+          <span style="opacity:.7;">Indeks</span>
+          <strong>${index}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:16px;">
+          <span style="opacity:.7;">vs rata-rata</span>
+          <strong style="color:${dev>=0?'#E8B84B':'#a0d090'};">${sign}${dev.toFixed(1).replace(".",",")}%</strong>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,0.12);margin:6px 0;"></div>
+        <div style="display:flex;justify-content:space-between;gap:16px;">
+          <span style="opacity:.7;">Harga bulan ini</span>
+          <strong>${fmtRp(value)}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:16px;">
+          <span style="opacity:.7;">Rata-rata tahunan</span>
+          <span style="opacity:.8;">${fmtRp(avg)}</span>
+        </div>`;
+
+      tt.style.display = "block";
+      td.style.filter = "brightness(1.1)";
+      const rect = td.getBoundingClientRect();
+      tt.style.left = Math.min(rect.left, window.innerWidth - 210) + "px";
+      tt.style.top  = (rect.top - tt.offsetHeight - 8) + "px";
+    };
+    window._seasOut = function() {
+      const tt = document.getElementById("seas-tooltip");
+      if (tt) tt.style.display = "none";
+      document.querySelectorAll("#heatmap-wrap td[data-key]")
+        .forEach(td => td.style.filter = "");
+    };
+
+    // Populate KPI cards + insight
+    ROWS.forEach(({ key }) => {
+      const { peak, trough, amp } = amplitudes[key];
+      const sign = amp >= 0 ? "+" : "";
+      setText(`seas-${key}-peak`,   peak.labelID   || "-");
+      setText(`seas-${key}-trough`, trough.labelID || "-");
+      setText(`seas-${key}-amp`,    `${sign}${amp.toFixed(1).replace(".",",")}%`);
+    });
+
+    // Dynamic insight text
+    const ampSapi  = amplitudes.sapi?.amp  || 0;
+    const ampAyam  = amplitudes.ayam?.amp  || 0;
+    const ratio    = ampSapi > 0 ? (ampAyam / ampSapi) : 0;
+    const fmt = v => v.toFixed(1).replace(".", ",");
+    setText("seas-insight-ayam-amp", `${fmt(ampAyam)}%`);
+    setText("seas-insight-sapi-amp", `${fmt(ampSapi)}%`);
+    setText("seas-insight-ratio",    `${ratio.toFixed(1).replace(".", ",")}`);
+  }
+
+  /* ─── SCENE 4: KETIMPANGAN ─── */
+  function renderKetimpangan(scenes) {
+    const landscape = scenes?.landscape || {};
+    const inequality = scenes?.inequality || {};
+    const C = COLORS;
+    const tick = '#9A8060', fnt = 'DM Sans', grid = 'rgba(92,61,30,0.055)';
+
+    // Scatter: UMP vs Harga Sapi per pulau (agregat rata-rata provinsi)
+    const scatterRows = (inequality.scatter || [])
+      .filter(d => d.ump && d.sapi)
+      .map(d => ({
+        province: d.province,
+        island: PROVINCE_ISLAND[d.province] || "Lainnya",
+        x: Number(d.ump),
+        y: Number(d.sapi)
+      }));
+    const islandAgg = Object.keys(ISLAND_COLORS)
+      .map(island => {
+        const rows = scatterRows.filter(d => d.island === island);
+        if (!rows.length) return null;
+        return {
+          island,
+          x: rows.reduce((a, b) => a + b.x, 0) / rows.length,
+          y: rows.reduce((a, b) => a + b.y, 0) / rows.length,
+          n: rows.length
+        };
+      })
+      .filter(Boolean);
+
+    const c4a = document.getElementById('c4a');
+    if (c4a) {
+      if (chartInstances['c4a']) chartInstances['c4a'].destroy();
+      chartInstances['c4a'] = new Chart(c4a, {
+        plugins: [{
+          id: "islandPointLabels",
+          afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            const meta = chart.getDatasetMeta(0);
+            const points = chart.data.datasets[0]?.data || [];
+            ctx.save();
+            ctx.font = "10px 'DM Sans', sans-serif";
+            ctx.fillStyle = "#5C4A30";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            points.forEach((d, i) => {
+              const pt = meta.data[i];
+              if (!pt) return;
+              const x = pt.x + 8;
+              const y = pt.y - 8;
+              ctx.fillText(d.island || "-", x, y);
+            });
+            ctx.restore();
+          }
+        }],
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: "Pulau",
+            data: islandAgg,
+            backgroundColor: islandAgg.map(d => ISLAND_COLORS[d.island] + "CC"),
+            borderColor: "transparent",
+            pointRadius: islandAgg.map(d => 5 + Math.min(4, d.n / 3)),
+            pointHoverRadius: islandAgg.map(d => 8 + Math.min(4, d.n / 3))
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {callbacks:{label: ctx => {
+              const d = ctx.raw || {};
+              return `${d.island || '-'} (${d.n || 0} provinsi) — UMP rata-rata: ${fmtShortRp(d.x)} | Sapi rata-rata: ${fmtShortRp(d.y)}/kg`;
+            }}}
+          },
+          scales: {
+            x: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>'Rp'+(v/1e6).toFixed(1)+'jt'}, grid:{color:grid}, border:{color:'transparent'},
+                title:{display:true,text:'UMP 2025 (Rp/bulan)',color:tick,font:{size:9,family:fnt}}},
+            y: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>'Rp'+(v/1000).toFixed(0)+'rb'}, grid:{color:grid}, border:{color:'transparent'},
+                title:{display:true,text:'Harga Sapi Apr 2026 (Rp/kg)',color:tick,font:{size:9,family:fnt}},
+                min:100000, max:180000}
+          }
+        }
+      });
+    }
+
+    // Gap lollipop antar komoditas, baseline minimum komoditas (bukan nol)
+    const gapEl = document.getElementById('gap-lollipop');
+    if (gapEl) {
+      const gapData = (inequality.gap || [])
+        .filter(d => d.value != null)
+        .map(d => ({ label: d.label, val: Number(d.value), color: d.color || C[d.key] || '#9A8060' }));
+      const minGap = Math.min(...gapData.map(d => d.val));
+      const maxGap = Math.max(...gapData.map(d => d.val));
+      const range = Math.max(maxGap - minGap, 1);
+      let html = '<div style="padding:8px 0;">';
+      gapData.forEach(item => {
+        const pct = (((item.val - minGap) / range) * 100).toFixed(1);
+        html += `<div style="margin-bottom:22px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <span style="font-size:11.5px;color:var(--text2);">${item.label}</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text2);">Rp ${item.val.toLocaleString('id-ID')}</span>
+          </div>
+          <div style="position:relative;height:16px;display:flex;align-items:center;">
+            <div style="position:absolute;left:0;right:0;height:2px;background:var(--cream3);border-radius:1px;"></div>
+            <div style="position:absolute;left:0;width:${pct}%;height:2px;background:${item.color};border-radius:1px;"></div>
+            <div style="position:absolute;left:${pct}%;transform:translateX(-50%);width:12px;height:12px;border-radius:50%;background:${item.color};box-shadow:0 0 0 3px rgba(255,255,255,0.9),0 0 0 4px ${item.color}40;transition:transform .2s;"
+              onmouseover="this.style.transform='translateX(-50%) scale(1.4)'"
+              onmouseout="this.style.transform='translateX(-50%)'"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:8.5px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:4px;">
+            <span>Rp ${Math.round(minGap).toLocaleString('id-ID')}</span><span>Rp ${Math.round(maxGap).toLocaleString('id-ID')}</span>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+      gapEl.innerHTML = html;
+    }
+  }
+
+  /* ─── SCENE 5: NUTRISI ─── */
+  function renderNutrisi(scenes) {
+    const nutritionScene = scenes?.nutrition || {};
+    const nutrisi = nutritionScene?.raw || {};
+    const efficiency = nutritionScene?.efficiency || {};
+    const C = COLORS;
+    const tick = '#9A8060', fnt = 'DM Sans', grid = 'rgba(92,61,30,0.055)';
+
+    // Protein per Rp 1000 (g) dari processor
+    const protPer1k = {
+      sapi:  Number(efficiency.sapi?.proteinPerRp1000)  || 1.3,
+      ayam:  Number(efficiency.ayam?.proteinPerRp1000)  || 4.3,
+      telur: Number(efficiency.telur?.proteinPerRp1000) || 3.7
+    };
+
+    // Bar chart: protein per Rp 1000
+    const c6b = document.getElementById('c6b');
+    if (c6b && !chartInstances['c6b']) {
+      chartInstances['c6b'] = new Chart(c6b, {
+        type: 'bar',
+        data: {
+          labels: ['Daging Sapi','Daging Ayam','Telur Ayam'],
+          datasets: [{
+            data: [protPer1k.sapi, protPer1k.ayam, protPer1k.telur],
+            backgroundColor: [C.sapi, C.ayam, C.telur],
+            borderRadius: 4, borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.parsed.y.toFixed(2)+' g protein per Rp 1.000'}}},
+          scales: {
+            x: {ticks:{color:tick,font:{family:fnt,size:10}}, grid:{color:'transparent'}, border:{color:'transparent'}},
+            y: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>v.toFixed(1)+' g'}, grid:{color:grid}, border:{color:'transparent'},
+                title:{display:true,text:'gram protein per Rp 1.000',color:tick,font:{size:8.5,family:fnt}}}
+          }
+        }
+      });
+    }
+
+    // Waffle chart efisiensi per Rp10.000
+    const waffleEl = document.getElementById('waffle-wrap');
+    if (waffleEl) {
+      const items = [
+        {label:`Sapi (${(protPer1k.sapi*10).toFixed(1)}g)`, count:Math.round(protPer1k.sapi*10), color:C.sapi},
+        {label:`Ayam (${(protPer1k.ayam*10).toFixed(1)}g)`, count:Math.round(protPer1k.ayam*10), color:C.ayam},
+        {label:`Telur (${(protPer1k.telur*10).toFixed(1)}g)`, count:Math.round(protPer1k.telur*10), color:C.telur}
+      ];
+      let html = `<div style="margin-bottom:8px;font-size:10px;color:var(--text3);">Tiap sel = 1g protein per Rp 10.000 dibelanjakan</div>`;
+      items.forEach(item => {
+        html += `<div style="margin-bottom:10px;">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">${item.label}</div>
+          <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:2px;max-width:200px;">`;
+        for (let i = 0; i < 50; i++) {
+          const filled = i < item.count;
+          html += `<div style="aspect-ratio:1;border-radius:2px;background:${filled?item.color:'var(--cream3)'};opacity:${filled?1:0.4};transition:opacity .15s;" title="${filled?item.label:''}"></div>`;
+        }
+        html += '</div></div>';
+      });
+      waffleEl.innerHTML = html;
+    }
+
+    // Waffle kandungan nutrisi per komoditas (ambil dari angka card yang tampil)
+    const nutCardWaffle = document.getElementById("nut-card-waffle");
+    if (nutCardWaffle) {
+      const parseNum = (txt) => {
+        const n = String(txt || "").replace(",", ".").match(/-?\d+(\.\d+)?/);
+        return n ? Number(n[0]) : 0;
+      };
+      const nutrientColors = {
+        "Protein": "#5A7A52",
+        "Lemak": "#C9952A",
+        "Kalori": "#A3783F",
+        "Karbohidrat": "#C4522A"
+      };
+      const cards = Array.from(document.querySelectorAll("#nut-100g .nut-card")).map(card => {
+        const label = card.querySelector(".nut-card-title")?.textContent?.trim() || "-";
+        const rows = Array.from(card.querySelectorAll(".nbar-row")).map(row => {
+          const name = row.querySelector(".nbar-label")?.textContent?.trim() || "-";
+          const valueTxt = row.querySelector(".nbar-val")?.textContent?.trim() || "0";
+          return { name, value: parseNum(valueTxt), valueTxt };
+        });
+        return { label, rows };
+      });
+      const nutrientMax = {};
+      Object.keys(nutrientColors).forEach(n => {
+        nutrientMax[n] = Math.max(1, ...cards.map(c => c.rows.find(r => r.name === n)?.value || 0));
+      });
+      let html = `<div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Waffle di bawah ini dibuat dari angka nutrisi yang tampil di card (tiap baris = 30 sel skala relatif per nutrisi).</div>`;
+      cards.forEach(card => {
+        html += `<div style="margin-bottom:14px;">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:6px;"><strong>${card.label}</strong></div>`;
+        card.rows.forEach(r => {
+          if (!nutrientColors[r.name]) return;
+          const filled = Math.round((r.value / nutrientMax[r.name]) * 30);
+          html += `<div style="display:grid;grid-template-columns:86px 1fr auto;gap:8px;align-items:center;margin-bottom:4px;">
+            <span style="font-size:10px;color:var(--text2);">${r.name}</span>
+            <div style="display:grid;grid-template-columns:repeat(30,1fr);gap:2px;max-width:220px;">
+              ${Array.from({ length: 30 }).map((_, i) =>
+                `<div class="waffle-cell" style="background:${nutrientColors[r.name]};opacity:${i < filled ? 1 : 0.16};"></div>`
+              ).join("")}
+            </div>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text2);">${r.valueTxt}</span>
+          </div>`;
+        });
+        html += `</div>`;
+      });
+      nutCardWaffle.innerHTML = html;
+    }
+
+    // Waffle simulasi uang X: berapa gram produk & protein didapat
+    const moneySlider = document.getElementById("money-budget");
+    const moneyLabel = document.getElementById("money-budget-label");
+    const moneyWaffle = document.getElementById("money-waffle-wrap");
+    if (moneySlider && moneyLabel && moneyWaffle) {
+      const base = [
+        { key: "sapi", label: "Daging Sapi", color: C.sapi, price: Number(efficiency.sapi?.pricePerKg) || 145000, protein100: Number(nutrisi.sapi?.protein) || 18.8 },
+        { key: "ayam", label: "Daging Ayam", color: C.ayam, price: Number(efficiency.ayam?.pricePerKg) || 42000, protein100: Number(nutrisi.ayam?.protein) || 18.2 },
+        { key: "telur", label: "Telur Ayam", color: C.telur, price: Number(efficiency.telur?.pricePerKg) || 33000, protein100: Number(nutrisi.telur?.protein) || 12.4 }
+      ];
+      const updateMoney = () => {
+        const money = Number(moneySlider.value || 50000);
+        moneyLabel.textContent = "Rp " + money.toLocaleString("id-ID");
+        let html = `<div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Estimasi yang didapat jika seluruh budget dibelikan satu komoditas (tiap sel = 10g bahan).</div>`;
+        base.forEach(item => {
+          const grams = (money / item.price) * 1000;
+          const proteinGram = (grams / 100) * item.protein100;
+          const filled = Math.max(0, Math.min(100, Math.round(grams / 10)));
+          html += `<div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--text2);margin-bottom:6px;">
+              <span><strong>${item.label}</strong></span>
+              <span>${Math.round(grams).toLocaleString("id-ID")} g · ${proteinGram.toFixed(1).replace(".",",")} g protein</span>
+            </div>
+            <div class="waffle-grid" style="max-width:260px;">
+              ${Array.from({ length: 100 }).map((_, i) =>
+                `<div class="waffle-cell" style="background:${item.color};opacity:${i < filled ? 1 : 0.18};"></div>`
+              ).join("")}
+            </div>
+          </div>`;
+        });
+        moneyWaffle.innerHTML = html;
+      };
+      if (!moneySlider.dataset.bound) {
+        moneySlider.addEventListener("input", updateMoney);
+        moneySlider.dataset.bound = "1";
+      }
+      updateMoney();
+    }
+
+    // Insight teks efisiensi
+    const ratio = protPer1k.telur / protPer1k.sapi;
+    const insightEl = document.getElementById('nut-rp-insight');
+    if (insightEl) {
+      insightEl.innerHTML = `Dengan harga Apr 2026, setiap Rp 1.000 untuk telur menghasilkan <strong>sekitar ${ratio.toFixed(1).replace('.',',')}x lebih banyak protein</strong> dibanding daging sapi, dan sekitar ${(protPer1k.telur/protPer1k.ayam).toFixed(1).replace('.',',')}x lebih banyak dari ayam.`;
+    }
+  }
+
+  /* ─── SCENE 6: DAYA BELI ─── */
+  function renderDayaBeli(scenes) {
+    const C = COLORS;
+    const tick = '#9A8060', fnt = 'DM Sans', grid = 'rgba(92,61,30,0.055)';
+    const aff = scenes?.affordability?.rows || {};
+
+    // Data top 10 provinsi (kembali ke versi sebelumnya)
+    const affLabels = ['NTT','Jabar','Jateng','Maluku Ut.','DIY','Sulteng','Kalbar','Jatim','Gorontalo','Maluku'];
+    const affVals   = [21.3, 20.2, 19.5, 18.8, 18.6, 18.4, 18.3, 18.3, 18.1, 18.1];
+    const avgByCommodity = {
+      sapi: mean((aff.sapi || []).map(d => d.percentUMP)) || 44.6,
+      ayam: mean((aff.ayam || []).map(d => d.percentUMP)) || 13.5,
+      telur: mean((aff.telur || []).map(d => d.percentUMP)) || 15.5
+    };
+    const sortedAvg = [
+      { key: "sapi", label: "Daging Sapi", value: avgByCommodity.sapi, color: C.sapi },
+      { key: "ayam", label: "Daging Ayam", value: avgByCommodity.ayam, color: C.ayam },
+      { key: "telur", label: "Telur Ayam", value: avgByCommodity.telur, color: C.telur }
+    ].sort((a, b) => b.value - a.value);
+
+    // KPI cards -> beban protein per komoditas
+    setText('afford-worst-val',   `${sortedAvg[0].value.toFixed(1).replace(".", ",")}%`);
+    setText('afford-worst-unit',  `${sortedAvg[0].label} — rata-rata nasional`);
+    setText('afford-natavg-val',  `${sortedAvg[1].value.toFixed(1).replace(".", ",")}%`);
+    setText('afford-natavg-unit', `${sortedAvg[1].label} — rata-rata nasional`);
+    setText('afford-best-val',    `${sortedAvg[2].value.toFixed(1).replace(".", ",")}%`);
+    setText('afford-best-unit',   `${sortedAvg[2].label} — rata-rata nasional`);
+
+    // Bar chart top 10 provinsi
+    const c7a = document.getElementById('c7a');
+    if (c7a && !chartInstances['c7a']) {
+      chartInstances['c7a'] = new Chart(c7a, {
+        type: 'bar',
+        data: {
+          labels: affLabels,
+          datasets: [{
+            data: affVals,
+            backgroundColor: affVals.map(v => v >= 20 ? 'rgba(196,82,42,0.82)' : v >= 18 ? 'rgba(201,149,42,0.75)' : 'rgba(90,122,82,0.65)'),
+            borderWidth: 0, borderRadius: 3
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.parsed.x.toFixed(1)+'% UMP untuk penuhi 60g protein/hari'}}},
+          indexAxis: 'y',
+          scales: {
+            x: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>v+'%'}, grid:{color:grid}, border:{color:'transparent'}, max:25},
+            y: {ticks:{color:tick,font:{family:fnt,size:9}}, grid:{color:'transparent'}, border:{color:'transparent'}}
+          }
+        }
+      });
+    }
+
+    // Donut chart dihapus, ganti ringkasan beban per komoditas
+    const donutWrap = document.getElementById('afford-donut-wrap');
+    if (donutWrap) {
+      if (chartInstances['c7b']) {
+        chartInstances['c7b'].destroy();
+        delete chartInstances['c7b'];
+      }
+      donutWrap.innerHTML = `<div style="width:100%;display:flex;flex-direction:column;gap:12px;">
+        ${sortedAvg.map(item => `
+          <div style="padding:12px 14px;border:1px solid var(--line2);border-radius:8px;background:var(--white);">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px;">
+              <span style="font-size:11.5px;color:var(--text2);">${item.label}</span>
+              <strong style="font-family:'DM Mono',monospace;color:var(--brown);">${item.value.toFixed(1).replace(".", ",")}% UMP</strong>
+            </div>
+            <div style="height:6px;background:var(--cream2);border-radius:4px;overflow:hidden;">
+              <div style="height:6px;background:${item.color};width:${Math.min(item.value, 60) / 60 * 100}%;"></div>
+            </div>
+          </div>
+        `).join("")}
+        <div style="font-size:10px;color:var(--text3);line-height:1.5;">Rata-rata nasional kebutuhan biaya untuk memenuhi 60g protein/hari selama 30 hari, dibanding UMP 2025.</div>
+      </div>`;
+    }
+  }
+
+  /* ─── SCENE 7: FORECAST ─── */
+  function renderForecast(scenes) {
+    const monthly = scenes?.trend?.monthly || [];
+    const C = COLORS;
+    const tick = 'rgba(253,250,244,0.55)', fnt = 'DM Sans', grid = 'rgba(255,255,255,0.06)';
+
+    const trendLabels = monthly.map(d => d.label);
+    const sapiAct     = monthly.map(d => d.sapi);
+    const telurAct    = monthly.map(d => d.telur);
+
+    // Naive seasonal projection: last known seasonal index × trend
+    // Use 8-month ahead projection already computed, or fallback to hardcoded
+    const sapiPrj  = scenes?.forecast?.sapi  || [136671,136603,136618,136959,137101,137274,137351,137688];
+    const telurPrj = scenes?.forecast?.telur || [30069,29749,29944,30379,30266,30994,31469,32338];
+
+    // Scale projections by cumulative growth factor from actual data
+    const sapiScale  = sapiAct.length  ? (sapiAct[sapiAct.length-1]   / (sapiPrj[0]  || 1)) : 1;
+    const telurScale = telurAct.length ? (telurAct[telurAct.length-1]  / (telurPrj[0] || 1)) : 1;
+
+    const projLabels = ['Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    const allLabels  = [...trendLabels, ...projLabels];
+    const n = sapiAct.length;
+
+    const sapiActFull    = [...sapiAct,  ...Array(8).fill(null)];
+    const sapiPrjFull    = [...Array(n).fill(null), ...sapiPrj.map(v => Math.round(v * sapiScale))];
+    const telurActFull   = [...telurAct, ...Array(8).fill(null)];
+    const telurPrjFull   = [...Array(n).fill(null), ...telurPrj.map(v => Math.round(v * telurScale))];
+
+    const c8 = document.getElementById('c8');
+    if (c8 && !chartInstances['c8']) {
+      chartInstances['c8'] = new Chart(c8, {
+        type: 'line',
+        data: {
+          labels: allLabels,
+          datasets: [
+            {data:sapiActFull,   borderColor:C.sapi,   borderWidth:1.8, pointRadius:0, tension:.3, spanGaps:false},
+            {data:sapiPrjFull,   borderColor:C.sapi,   borderWidth:1.8, borderDash:[5,4], pointRadius:0, tension:.3, spanGaps:false, backgroundColor:'transparent'},
+            {data:telurActFull,  borderColor:'#E07040', borderWidth:1.8, pointRadius:0, tension:.3, spanGaps:false},
+            {data:telurPrjFull,  borderColor:'#E07040', borderWidth:1.8, borderDash:[5,4], pointRadius:0, tension:.3, spanGaps:false, backgroundColor:'transparent'}
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: {display:false},
+            tooltip: {mode:'index', intersect:false, callbacks:{label:ctx=>{
+              const names=['Sapi aktual','Sapi proyeksi','Telur aktual','Telur proyeksi'];
+              if (ctx.parsed.y === null) return null;
+              return (names[ctx.datasetIndex]||'')+': Rp'+ctx.parsed.y.toLocaleString('id-ID');
+            }}}
+          },
+          scales: {
+            x: {ticks:{color:tick,font:{family:fnt,size:8.5},maxTicksLimit:16,maxRotation:0}, grid:{color:grid}, border:{color:'transparent'}},
+            y: {ticks:{color:tick,font:{family:fnt,size:8.5},callback:v=>'Rp'+(v/1000).toFixed(0)+'rb'}, grid:{color:grid}, border:{color:'transparent'}}
+          }
+        }
+      });
+    }
+  }
+
+  function renderAll(scenes) {
+    console.log("Renderer jalan:", scenes);
+    renderHeroKPIs(scenes);
+    renderTrendKPIs(scenes);
+    renderLandscapeKPIs(scenes);
+    renderLandscapeVisuals(scenes);
+    renderLandscapeCallout(scenes);
+    renderTrendScene(scenes);
+    renderSeasonalHeatmap(scenes);
+    renderKetimpangan(scenes);
+    renderNutrisi(scenes);
+    renderDayaBeli(scenes);
+    renderForecast(scenes);
+  }
+
+  global.ProteinSceneRenderer = {
+    renderAll,
+    renderHeroKPIs,
+    renderTrendKPIs,
+    renderLandscapeKPIs,
+    renderLandscapeVisuals,
+    renderTrendScene,
+    renderTrendEventListAuto,
+    renderKetimpangan,
+    renderNutrisi,
+    renderDayaBeli,
+    renderForecast
+  };
+})(window);
