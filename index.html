@@ -1068,8 +1068,51 @@ function buildSim() {
   upd();
 }
 
+window.toggleLegend = function(el) {
+  const chartId = el.closest('.chart-card').querySelector('canvas').id;
+  const chart = Chart.getChart(chartId);
+  if (!chart) return;
 
+  const allItems = el.parentElement.querySelectorAll('.legend-item');
+  const dsLabel  = el.dataset.label; // label dataset yang diklik
 
+  // Cari dataset index berdasarkan data-label
+  const dsIndex = chart.data.datasets.findIndex(ds =>
+    ds.label === dsLabel
+  );
+  if (dsIndex === -1) return;
+
+  // Cek apakah minimal ada 1 dataset lain yang visible
+  const currentlyVisible = chart.data.datasets
+    .map((ds, i) => ({ hidden: ds.hidden, i }))
+    .filter(d => !d.hidden);
+
+  const clickedIsVisible = !chart.data.datasets[dsIndex].hidden;
+
+  // Kalau yang diklik satu-satunya yang visible, jangan sembunyikan (minimal 1 harus tampil)
+  if (clickedIsVisible && currentlyVisible.length === 1) {
+    // Show semua sebagai reset
+    chart.data.datasets.forEach(ds => ds.hidden = false);
+    allItems.forEach(item => item.classList.remove('dimmed'));
+  } else {
+    // Toggle dataset yang diklik
+    chart.data.datasets[dsIndex].hidden = clickedIsVisible;
+    el.classList.toggle('dimmed', clickedIsVisible);
+  }
+
+  chart.update();
+};
+window.switchKetimpanganTab = function(commodity, btn) {
+  // Update active tab button
+  if (btn && btn.closest('.tab-row')) {
+    btn.closest('.tab-row').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  // Re-render scatter plot dengan komoditas yang dipilih
+  if (window.ProteinSceneRenderer && window.PROTEIN_SCENE_DATA) {
+    ProteinSceneRenderer.renderKetimpanganByComodity(window.PROTEIN_SCENE_DATA, commodity);
+  }
+};
 window.addEventListener('DOMContentLoaded', () => {
   const sections = document.querySelectorAll('section[id]');
   const navDots = document.getElementById('navDots');
