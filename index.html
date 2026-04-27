@@ -647,19 +647,26 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       <p class="sec-lead">Provinsi dengan upah minimum rendah justru cenderung membayar harga pangan yang lebih tinggi. Bukan karena permintaannya besar, melainkan karena rantai distribusi ke sana lebih panjang dan mahal.</p>
     </div>
 
+    <div class="tab-row reveal">
+      <button class="tab-btn active" onclick="switchKetimpanganTab('sapi',this)">Daging Sapi</button>
+      <button class="tab-btn" onclick="switchKetimpanganTab('ayam',this)">Daging Ayam</button>
+      <button class="tab-btn" onclick="switchKetimpanganTab('telur',this)">Telur Ayam</button>
+    </div>
+
     <div class="grid2 reveal">
       <div class="chart-card" style="margin-bottom:0;">
-        <div class="chart-label">Harga sapi vs UMP per pulau — Apr 2026 (setiap titik = rata-rata pulau)</div>
-        <div class="chart-area" style="height:320px;"><canvas id="c4a"></canvas></div>
+        <div class="chart-label">Harga per komoditas vs UMP — Apr 2026</div>
+        <div class="chart-area" style="height:340px;"><canvas id="c4a"></canvas></div>
+        <div id="ketimpangan-legend" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:11px;"></div>
       </div>
-      <div class="chart-card" style="margin-bottom:0;">
+      <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column;justify-content:center;">
         <div class="chart-label">Gap harga maks - min antar provinsi per komoditas (Rp/kg)</div>
-        <div id="gap-lollipop" style="padding:24px 0;"></div>
+        <div id="gap-lollipop" style="padding:8px 0;"></div>
       </div>
     </div>
 
-    <div class="story-callout reveal" style="margin-top:12px;">
-      Titik-titik di kanan bawah scatter plot menandakan provinsi dengan UMP tinggi dan harga sapi tidak ikut tinggi, seperti DKI Jakarta dan Kepulauan Riau. Sebaliknya, beberapa provinsi Jawa dengan UMP terendah membayar harga sapi di kisaran Rp 139.000–155.000.
+    <div class="story-callout reveal" id="ketimpangan-conclusion" style="margin-top:12px;">
+      [Kesimpulan akan diisi otomatis dari data]
     </div>
   </div>
   </div>

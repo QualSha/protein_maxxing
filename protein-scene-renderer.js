@@ -1079,122 +1079,224 @@ function renderHeroKPIs(scenes) {
 
   /* ─── SCENE 4: KETIMPANGAN ─── */
   function renderKetimpangan(scenes) {
-    const landscape = scenes?.landscape || {};
+    const gapEl = document.getElementById('gap-lollipop');
+    if (gapEl) renderGapLollipop(scenes, gapEl);
+    renderKetimpanganByComodity(scenes, 'sapi');
+  }
+
+  function renderGapLollipop(scenes, gapEl) {
     const inequality = scenes?.inequality || {};
     const C = COLORS;
-    const tick = '#9A8060', fnt = 'DM Sans', grid = 'rgba(92,61,30,0.055)';
 
-    // Scatter: UMP vs Harga Sapi per pulau (agregat rata-rata provinsi)
-    const scatterRows = (inequality.scatter || [])
-      .filter(d => d.ump && d.sapi)
+    const gapData = (inequality.gap || [])
+      .filter(d => d.min != null && d.max != null)
+      .map(d => ({
+        label: d.label,
+        min: Number(d.min),
+        minProvince: d.minProvince || '-',
+        max: Number(d.max),
+        maxProvince: d.maxProvince || '-',
+        gap: Number(d.max) - Number(d.min),
+        color: d.color || C[d.key] || '#9A8060'
+      }));
+
+    if (!gapData.length) { gapEl.innerHTML = ''; return; }
+
+    // Axis global agar skala sama antar-komoditas
+    const allValues = gapData.flatMap(d => [d.min, d.max]);
+    const globalMin = Math.min(...allValues);
+    const globalMax = Math.max(...allValues);
+    const globalRange = Math.max(globalMax - globalMin, 1);
+
+    const PAD = 0.05;
+    function toPct(v) {
+      return PAD * 100 + ((v - globalMin) / globalRange) * (1 - 2 * PAD) * 100;
+    }
+
+    let html = '<div style="padding:0;">';
+
+    gapData.forEach((item, i) => {
+      const pctMin = toPct(item.min);
+      const pctMax = toPct(item.max);
+      const connectorWidth = pctMax - pctMin;
+      const pctMid = (pctMin + pctMax) / 2;
+      const isLast = i === gapData.length - 1;
+
+      html += `
+        <div style="margin-bottom:${isLast ? '0' : '36px'};">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:${item.color};flex-shrink:0;"></div>
+            <span style="font-size:14px;color:var(--text2);font-weight:600;">${item.label}</span>
+          </div>
+          <div style="position:relative;height:32px;">
+            <!-- Background track -->
+            <div style="position:absolute;top:50%;left:0;right:0;height:2px;
+              background:var(--cream3);border-radius:1px;transform:translateY(-50%);"></div>
+            <!-- Connector -->
+            <div style="position:absolute;top:50%;left:${pctMin}%;width:${connectorWidth}%;height:4px;
+              background:${item.color};border-radius:2px;transform:translateY(-50%);"></div>
+            <!-- Gap label -->
+            <div style="position:absolute;top:0;left:${pctMid}%;transform:translateX(-50%);
+              font-family:'DM Mono',monospace;font-size:9.5px;font-weight:600;
+              color:${item.color};white-space:nowrap;line-height:1;
+              background:var(--white,#FDFAF4);padding:0 4px;">
+              ← Rp ${item.gap.toLocaleString('id-ID')} →
+            </div>
+            <!-- Dot MIN -->
+            <div style="position:absolute;top:50%;left:${pctMin}%;
+              transform:translate(-50%,-50%);
+              width:14px;height:14px;border-radius:50%;
+              background:var(--white,#FDFAF4);border:2.5px solid ${item.color};
+              z-index:2;box-sizing:border-box;cursor:default;transition:transform .15s;"
+              onmouseover="this.style.transform='translate(-50%,-50%) scale(1.4)';this.nextElementSibling.style.opacity='1';"
+              onmouseout="this.style.transform='translate(-50%,-50%)';this.nextElementSibling.style.opacity='0';">
+            </div>
+            <!-- Tooltip MIN -->
+            <div style="position:absolute;top:calc(50% + 14px);left:${pctMin}%;transform:translateX(-50%);
+              white-space:nowrap;pointer-events:none;
+              background:#5C3D1E;color:#FDFAF4;
+              font-family:'DM Mono',monospace;font-size:9.5px;line-height:1.7;
+              padding:6px 11px;border-radius:7px;
+              opacity:0;transition:opacity .15s;z-index:10;">
+              <div style="opacity:.7;font-size:8.5px;margin-bottom:1px;">Termurah</div>
+              <div>${item.minProvince}</div>
+              <div style="color:#E8B84B;font-weight:600;">Rp ${item.min.toLocaleString('id-ID')}</div>
+            </div>
+            <!-- Dot MAX -->
+            <div style="position:absolute;top:50%;left:${pctMax}%;
+              transform:translate(-50%,-50%);
+              width:14px;height:14px;border-radius:50%;
+              background:${item.color};
+              box-shadow:0 0 0 3px rgba(253,250,244,0.9);
+              z-index:3;box-sizing:border-box;cursor:default;transition:transform .15s;"
+              onmouseover="this.style.transform='translate(-50%,-50%) scale(1.4)';this.nextElementSibling.style.opacity='1';"
+              onmouseout="this.style.transform='translate(-50%,-50%)';this.nextElementSibling.style.opacity='0';">
+            </div>
+            <!-- Tooltip MAX -->
+            <div style="position:absolute;top:calc(50% + 14px);left:${pctMax}%;transform:translateX(-50%);
+              white-space:nowrap;pointer-events:none;
+              background:#5C3D1E;color:#FDFAF4;
+              font-family:'DM Mono',monospace;font-size:9.5px;line-height:1.7;
+              padding:6px 11px;border-radius:7px;
+              opacity:0;transition:opacity .15s;z-index:10;">
+              <div style="opacity:.7;font-size:8.5px;margin-bottom:1px;">Termahal</div>
+              <div>${item.maxProvince}</div>
+              <div style="color:#E8B84B;font-weight:600;">Rp ${item.max.toLocaleString('id-ID')}</div>
+            </div>
+          </div>
+        </div>`;
+    });
+
+    html += '</div>';
+    gapEl.innerHTML = html;
+  }
+
+  function renderKetimpanganByComodity(scenes, commodity = 'sapi') {
+    const inequality = scenes?.inequality || {};
+    const tick = '#9A8060', fnt = 'DM Sans', grid = 'rgba(92,61,30,0.055)';
+    const LABEL = { sapi: "Daging Sapi", ayam: "Daging Ayam", telur: "Telur Ayam" };
+    const commodityLabel = LABEL[commodity] || "Komoditas";
+
+    const scatterData = (inequality.scatter || [])
+      .filter(d => d.ump && d[commodity])
       .map(d => ({
         province: d.province,
         island: PROVINCE_ISLAND[d.province] || "Lainnya",
         x: Number(d.ump),
-        y: Number(d.sapi)
+        y: Number(d[commodity])
       }));
-    const islandAgg = Object.keys(ISLAND_COLORS)
-      .map(island => {
-        const rows = scatterRows.filter(d => d.island === island);
-        if (!rows.length) return null;
-        return {
-          island,
-          x: rows.reduce((a, b) => a + b.x, 0) / rows.length,
-          y: rows.reduce((a, b) => a + b.y, 0) / rows.length,
-          n: rows.length
-        };
-      })
-      .filter(Boolean);
+
+    // Calculate min-max for this commodity
+    const yValues = scatterData.map(d => d.y).filter(v => Number.isFinite(v));
+    const minY = Math.min(...yValues);
+    const maxY = Math.max(...yValues);
+    const padding = (maxY - minY) * 0.1;
+
+    // Create dataset grouped by island
+    const datasets = Object.keys(ISLAND_COLORS).map(island => {
+      const islandPoints = scatterData.filter(d => d.island === island);
+      return {
+        label: island,
+        data: islandPoints,
+        backgroundColor: ISLAND_COLORS[island] + "88",
+        borderColor: ISLAND_COLORS[island] + "DD",
+        borderWidth: 1.5,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        showLine: false
+      };
+    }).filter(ds => ds.data.length > 0);
 
     const c4a = document.getElementById('c4a');
     if (c4a) {
       if (chartInstances['c4a']) chartInstances['c4a'].destroy();
       chartInstances['c4a'] = new Chart(c4a, {
-        plugins: [{
-          id: "islandPointLabels",
-          afterDatasetsDraw(chart) {
-            const { ctx } = chart;
-            const meta = chart.getDatasetMeta(0);
-            const points = chart.data.datasets[0]?.data || [];
-            ctx.save();
-            ctx.font = "10px 'DM Sans', sans-serif";
-            ctx.fillStyle = "#5C4A30";
-            ctx.textAlign = "left";
-            ctx.textBaseline = "middle";
-            points.forEach((d, i) => {
-              const pt = meta.data[i];
-              if (!pt) return;
-              const x = pt.x + 8;
-              const y = pt.y - 8;
-              ctx.fillText(d.island || "-", x, y);
-            });
-            ctx.restore();
-          }
-        }],
         type: 'scatter',
-        data: {
-          datasets: [{
-            label: "Pulau",
-            data: islandAgg,
-            backgroundColor: islandAgg.map(d => ISLAND_COLORS[d.island] + "CC"),
-            borderColor: "transparent",
-            pointRadius: islandAgg.map(d => 5 + Math.min(4, d.n / 3)),
-            pointHoverRadius: islandAgg.map(d => 8 + Math.min(4, d.n / 3))
-          }]
-        },
+        data: { datasets },
         options: {
-          responsive: true, maintainAspectRatio: false,
+          responsive: true,
+          maintainAspectRatio: false,
           plugins: {
-            legend: {
-              display: false
-            },
-            tooltip: {callbacks:{label: ctx => {
-              const d = ctx.raw || {};
-              return `${d.island || '-'} (${d.n || 0} provinsi) — UMP rata-rata: ${fmtShortRp(d.x)} | Sapi rata-rata: ${fmtShortRp(d.y)}/kg`;
-            }}}
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const d = ctx.raw || {};
+                  return `${d.province}: ${fmtRp(d.y)}`;
+                }
+              }
+            }
           },
           scales: {
-            x: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>'Rp'+(v/1e6).toFixed(1)+'jt'}, grid:{color:grid}, border:{color:'transparent'},
-                title:{display:true,text:'UMP 2025 (Rp/bulan)',color:tick,font:{size:9,family:fnt}}},
-            y: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>'Rp'+(v/1000).toFixed(0)+'rb'}, grid:{color:grid}, border:{color:'transparent'},
-                title:{display:true,text:'Harga Sapi Apr 2026 (Rp/kg)',color:tick,font:{size:9,family:fnt}},
-                min:100000, max:180000}
+            x: {
+              ticks: { color: tick, font: { family: fnt, size: 9 }, callback: v => 'Rp' + (v / 1e6).toFixed(1) + 'jt' },
+              grid: { color: grid },
+              border: { color: 'transparent' },
+              title: { display: true, text: 'UMP 2025 (Rp/bulan)', color: tick, font: { size: 9, family: fnt } }
+            },
+            y: {
+              ticks: { color: tick, font: { family: fnt, size: 9 }, callback: v => 'Rp' + (v / 1000).toFixed(0) + 'rb' },
+              grid: { color: grid },
+              border: { color: 'transparent' },
+              title: { display: true, text: `Harga ${commodityLabel} Apr 2026 (Rp/kg)`, color: tick, font: { size: 9, family: fnt } },
+              min: minY - padding,
+              max: maxY + padding
+            }
           }
         }
       });
     }
 
-    // Gap lollipop antar komoditas, baseline minimum komoditas (bukan nol)
-    const gapEl = document.getElementById('gap-lollipop');
-    if (gapEl) {
-      const gapData = (inequality.gap || [])
-        .filter(d => d.value != null)
-        .map(d => ({ label: d.label, val: Number(d.value), color: d.color || C[d.key] || '#9A8060' }));
-      const minGap = Math.min(...gapData.map(d => d.val));
-      const maxGap = Math.max(...gapData.map(d => d.val));
-      const range = Math.max(maxGap - minGap, 1);
-      let html = '<div style="padding:8px 0;">';
-      gapData.forEach(item => {
-        const pct = (((item.val - minGap) / range) * 100).toFixed(1);
-        html += `<div style="margin-bottom:22px;">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-            <span style="font-size:11.5px;color:var(--text2);">${item.label}</span>
-            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text2);">Rp ${item.val.toLocaleString('id-ID')}</span>
-          </div>
-          <div style="position:relative;height:16px;display:flex;align-items:center;">
-            <div style="position:absolute;left:0;right:0;height:2px;background:var(--cream3);border-radius:1px;"></div>
-            <div style="position:absolute;left:0;width:${pct}%;height:2px;background:${item.color};border-radius:1px;"></div>
-            <div style="position:absolute;left:${pct}%;transform:translateX(-50%);width:12px;height:12px;border-radius:50%;background:${item.color};box-shadow:0 0 0 3px rgba(255,255,255,0.9),0 0 0 4px ${item.color}40;transition:transform .2s;"
-              onmouseover="this.style.transform='translateX(-50%) scale(1.4)'"
-              onmouseout="this.style.transform='translateX(-50%)'"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:8.5px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:4px;">
-            <span>Rp ${Math.round(minGap).toLocaleString('id-ID')}</span><span>Rp ${Math.round(maxGap).toLocaleString('id-ID')}</span>
-          </div>
-        </div>`;
+    // Render legend
+    const legendEl = document.getElementById('ketimpangan-legend');
+    if (legendEl) {
+      let legendHtml = '';
+      Object.keys(ISLAND_COLORS).forEach(island => {
+        const count = scatterData.filter(d => d.island === island).length;
+        if (count > 0) {
+          legendHtml += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:${ISLAND_COLORS[island]};"></span>
+            <span>${island} (${count})</span>
+          </div>`;
+        }
       });
-      html += '</div>';
-      gapEl.innerHTML = html;
+      legendEl.innerHTML = legendHtml;
+    }
+
+    // Generate conclusion
+    const conclusionEl = document.getElementById('ketimpangan-conclusion');
+    if (conclusionEl) {
+      const topUmpProvs = [...scatterData].sort((a, b) => b.x - a.x).slice(0, 3);
+      const lowUmpProvs = [...scatterData].sort((a, b) => a.x - b.x).slice(0, 3);
+      const topPriceProvs = [...scatterData].sort((a, b) => b.y - a.y).slice(0, 3);
+
+      const topUmpNames = topUmpProvs.map(p => `<strong>${p.province}</strong>`).join(', ');
+      const lowUmpNames = lowUmpProvs.map(p => `<strong>${p.province}</strong>`).join(', ');
+      const topPriceNames = topPriceProvs.map(p => `<strong>${p.province}</strong> (Rp ${p.y.toLocaleString('id-ID')}/kg)`).join(', ');
+
+      const conclusion = `Pada ${commodityLabel}, pola ketimpangan terlihat jelas: provinsi-provinsi dengan UMP tinggi seperti ${topUmpNames} tidak otomatis membayar harga yang lebih mahal. Sebaliknya, provinsi dengan UMP rendah seperti ${lowUmpNames} justru menghadapi harga termahal, termasuk ${topPriceNames}. Ini menunjukkan <strong>double burden</strong> bagi provinsi dengan ekonomi lemah — upah rendah namun beban pangan tinggi.`;
+
+      conclusionEl.innerHTML = conclusion;
     }
   }
 
@@ -1515,6 +1617,7 @@ function renderHeroKPIs(scenes) {
     renderTrendScene,
     renderTrendEventListAuto,
     renderKetimpangan,
+    renderKetimpanganByComodity,
     renderNutrisi,
     renderDayaBeli,
     renderForecast
