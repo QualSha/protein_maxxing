@@ -1387,28 +1387,67 @@ function renderHeroKPIs(scenes) {
     // Bar chart top 10 provinsi
     const c7a = document.getElementById('c7a');
     if (c7a && !chartInstances['c7a']) {
-      chartInstances['c7a'] = new Chart(c7a, {
+        
+        const dataSapi = affLabels.map(prov => {
+            const d = (aff.sapi || []).find(item => item.prov === prov);
+            return d ? d.percentUMP : 44.6; 
+        });
+
+        const dataAyam = affLabels.map(prov => {
+            const d = (aff.ayam || []).find(item => item.prov === prov);
+            return d ? d.percentUMP : 13.5;
+        });
+
+        chartInstances['c7a'] = new Chart(c7a, {
         type: 'bar',
         data: {
-          labels: affLabels,
-          datasets: [{
-            data: affVals,
-            backgroundColor: affVals.map(v => v >= 20 ? 'rgba(196,82,42,0.82)' : v >= 18 ? 'rgba(201,149,42,0.75)' : 'rgba(90,122,82,0.65)'),
-            borderWidth: 0, borderRadius: 3
-          }]
+            labels: affLabels,
+            datasets: [{
+                label: 'Telur Ayam',
+                data: affVals,
+                extraSapi: dataSapi,
+                extraAyam: dataAyam,
+                backgroundColor: 'rgba(201,149,42,0.75)',
+                borderWidth: 0, 
+                borderRadius: 4,
+                barPercentage: 0.85,      
+                categoryPercentage: 0.9,
+            }]
         },
         options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.parsed.x.toFixed(1)+'% UMP untuk penuhi 60g protein/hari'}}},
-          indexAxis: 'y',
-          scales: {
-            x: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>v+'%'}, grid:{color:grid}, border:{color:'transparent'}, max:25},
-            y: {ticks:{color:tick,font:{family:fnt,size:9}}, grid:{color:'transparent'}, border:{color:'transparent'}}
-          }
-        }
-      });
-    }
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(45, 36, 26, 0.95)',
+                    padding: 12,
+                    callbacks: {
+                        title: (ctx) => `Prov. ${ctx[0].label}`,
+                        label: (ctx) => {
+                            // Ambil data asli (Telur)
+                            const telurVal = ctx.parsed.y.toFixed(1);
+                            // Ambil data extra dari dataset yang sama pakai index yang pas
+                            const idx = ctx.dataIndex;
+                            const sapiVal = ctx.dataset.extraSapi[idx].toFixed(1);
+                            const ayamVal = ctx.dataset.extraAyam[idx].toFixed(1);
 
+                            return [
+                                `🥩 Daging Sapi: ${sapiVal}% UMP (Bandingan)`,
+                                `🍗 Daging Ayam: ${ayamVal}% UMP (Bandingan)`,
+                                `🥚 Telur Ayam: ${telurVal}% UMP`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: tick, font: { family: fnt, size: 9 } }, grid: { display: false }, border: { color: 'transparent' } },
+                y: { ticks: { color: tick, font: { family: fnt, size: 9 }, callback: v => v + '%' }, grid: { color: grid }, border: { color: 'transparent' }, max: 25 }
+            }
+        }
+    });
+    } 
   }
 
   /* FORECAST */
