@@ -95,6 +95,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:cen
 .legend-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 
 /* GRID */
+.grid1 { display: block; width: 100%; }
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
 
@@ -394,7 +395,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   <div class="section-inner">
   <div class="container">
     <div class="reveal">
-      <div class="eyebrow">Scene 01 — Lanskap Nasional</div>
+      <div class="eyebrow">Lanskap Nasional</div>
       <h2 class="sec-title">Di mana paling <em>mahal?</em></h2>
       <p class="sec-lead">Harga protein tidak seragam di seluruh Indonesia. Selisih antara provinsi termurah dan termahal bisa melampaui 40% untuk komoditas yang sama.</p>
     </div>
@@ -670,7 +671,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   <div class="section-inner">
   <div class="container">
     <div class="reveal">
-      <div class="eyebrow">Scene 05 — Nilai Gizi per Rupiah</div>
+      <div class="eyebrow">05 — Nilai Gizi per Rupiah</div>
       <h2 class="sec-title">Bukan soal harga,<br>soal <em>nilai gizinya</em></h2>
       <p class="sec-lead">Ketika harga naik, yang berubah bukan hanya pengeluaran: efisiensi nutrisi per rupiah juga berubah. Komoditas termurah belum tentu yang paling efisien untuk memenuhi kebutuhan protein harian.</p>
     </div>
@@ -773,12 +774,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   </div>
 </section>
 
-<!-- SCENE 6: DAYA BELI -->
+<!-- DAYA BELI -->
 <section class="section sec-white" id="s7" data-label="Daya Beli">
   <div class="section-inner">
   <div class="container">
     <div class="reveal">
-      <div class="eyebrow">Scene 07 — Daya Beli</div>
+      <div class="eyebrow">Daya Beli</div>
       <h2 class="sec-title">Berapa persen gaji<br>untuk <em>protein?</em></h2>
       <p class="sec-lead">Affordability Index: berapa persen UMP yang dibutuhkan untuk memenuhi 60g protein per hari selama sebulan, setara kebutuhan protein dewasa aktif. Data menggunakan UMP 2025 dan harga Apr 2026.</p>
     </div>
@@ -787,28 +788,32 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--rust);"></div>
         <div class="kpi-tag">Beban protein tertinggi</div>
-        <div class="kpi-val" id="afford-worst-val">-</div>
-        <div class="kpi-unit" id="afford-worst-unit">-</div>
-        <div class="afford-zone zone-red" style="margin-top:6px;">Rata-rata nasional</div>
+        <div class="kpi-val" id="afford-worst-daily">-</div> 
+        <div class="kpi-unit" id="afford-worst-desc">-</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-note" id="afford-worst-footer">-</div>
       </div>
+
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--gold);"></div>
         <div class="kpi-tag">Beban protein menengah</div>
-        <div class="kpi-val" id="afford-natavg-val">-</div>
-        <div class="kpi-unit" id="afford-natavg-unit">-</div>
+        <div class="kpi-val" id="afford-natavg-daily">-</div> 
+        <div class="kpi-unit" id="afford-natavg-desc">-</div>
         <div class="kpi-divider"></div>
-        <div class="kpi-note">Persentase UMP untuk memenuhi 60g protein/hari selama 30 hari</div>
+        <div class="kpi-note" id="afford-natavg-footer">-</div>
       </div>
+
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--sage);"></div>
         <div class="kpi-tag">Beban protein terendah</div>
-        <div class="kpi-val" id="afford-best-val">-</div>
-        <div class="kpi-unit" id="afford-best-unit">-</div>
-        <div class="afford-zone zone-ok" style="margin-top:6px;">Rata-rata nasional</div>
+        <div class="kpi-val" id="afford-best-daily">-</div> 
+        <div class="kpi-unit" id="afford-best-desc">-</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-note" id="afford-best-footer">-</div>
       </div>
     </div>
 
-    <div class="grid2 reveal">
+    <div class="grid1 reveal">
       <div class="chart-card" style="margin-bottom:0;">
         <div class="chart-label">10 provinsi dengan beban protein telur tertinggi (% UMP 2025, harga Apr 2026)</div>
         <div class="chart-area" style="height:280px;"><canvas id="c7a"></canvas></div>
@@ -826,7 +831,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   </div>
 </section>
 
-<!-- SCENE 7: PENUTUP -->
+<!-- PENUTUP -->
 <section class="section" id="s8" data-label="Kesimpulan" style="background:var(--brown);">
   <div class="section-inner">
   <div class="container">
@@ -1108,7 +1113,16 @@ window.addEventListener('DOMContentLoaded', () => {
     sections.forEach((s, i) => {
       const d = document.createElement('button');
       d.className = 'nav-dot';
-      d.textContent = String(i + 1).padStart(2, '0');
+      const totalSections = sections.length;
+      if (i === 0) {
+        d.innerHTML = '🏠';
+        d.style.fontSize = '13px';
+      } else if (i === totalSections - 1) {
+        d.innerHTML = '👤';
+        d.style.fontSize = '13px';
+      } else {
+        d.textContent = String(i + 1).padStart(2, '0');
+      }
       d.title = s.dataset.label || '';
       d.onclick = () => s.scrollIntoView({ behavior: 'smooth' });
       navDots.appendChild(d);
