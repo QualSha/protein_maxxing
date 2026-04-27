@@ -1488,7 +1488,7 @@ function renderHeroKPIs(scenes) {
       nutCardWaffle.innerHTML = html;
     }
 
-// Budget belanja: tampilkan banyak komoditas yang didapat dalam bar skala tetap 1 kg
+// Budget belanja: tampilkan banyak komoditas yang didapat dalam bar skala tetap 
 const moneySlider = document.getElementById("money-budget");
 const moneyLabel = document.getElementById("money-budget-label");
 const moneyQtyWrap = document.getElementById("money-qty-wrap");
@@ -1532,7 +1532,7 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
     const money = Number(moneySlider.value || 50000);
     moneyLabel.textContent = "Rp " + money.toLocaleString("id-ID");
 
-    const scaleMax = 1000; // fixed: 1 kg
+    const scaleMax = 5000; 
 
     const computed = base.map(item => {
       const grams = (money / item.price) * 1000;
@@ -1542,7 +1542,7 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
 
     let html = `
       <div style="font-size:10px;color:var(--text3);margin-bottom:10px;line-height:1.5;"> 
-        <br>Skala bar maksimal: <strong>1.000 g (1 kg)</strong>.
+        <br>Skala bar maksimal: <strong>5.000 g (5 kg)</strong>.
       </div>
 
       <div style="display:flex;gap:16px;font-size:10px;color:var(--text3);margin-bottom:14px;background:var(--white);padding:8px 12px;border-radius:6px;border:1px solid var(--line2);">
@@ -1665,12 +1665,43 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
       `;
     }
 
-    // Insight teks efisiensi
-    const ratio = protPer1k.telur / protPer1k.sapi;
-    const insightEl = document.getElementById('nut-rp-insight');
-    if (insightEl) {
-      insightEl.innerHTML = `Dengan harga Apr 2026, setiap Rp 1.000 untuk telur menghasilkan <strong>sekitar ${ratio.toFixed(1).replace('.',',')}x lebih banyak protein</strong> dibanding daging sapi, dan sekitar ${(protPer1k.telur/protPer1k.ayam).toFixed(1).replace('.',',')}x lebih banyak dari ayam.`;
-    }
+// Insight teks efisiensi
+const insightEl = document.getElementById("nut-rp-insight");
+
+if (insightEl && protPer1k?.telur && protPer1k?.sapi && protPer1k?.ayam) {
+  // 1. Peringkatkan komoditas dari yang paling efisien ke yang terendah
+  const efficiencyRank = [
+    { label: "Daging Ayam", val: protPer1k.ayam, color: "var(--ayam)" },
+    { label: "Telur Ayam", val: protPer1k.telur, color: "var(--telur)" },
+    { label: "Daging Sapi", val: protPer1k.sapi, color: "var(--sapi)" }
+  ].sort((a, b) => b.val - a.val);
+
+  const best = efficiencyRank[0];
+  const second = efficiencyRank[1];
+  const worst = efficiencyRank[2];
+
+  // 2. Kalkulasi rasio
+  const bestVsWorst = best.val / worst.val;
+  const bestVsSecond = best.val / second.val;
+
+  // 3. Render HTML dengan narasi dinamis dan tampilan yang lebih rapi
+  insightEl.innerHTML = `
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <div style="font-size:20px;line-height:1;margin-top:2px;">🥚</div>
+      <div>
+        <strong style="color:var(--brown);font-size:12.5px;display:block;margin-bottom:4px;">
+          ${best.label} merupakan sumber protein paling ekonomis.
+        </strong>
+        <span style="color:var(--text2);line-height:1.65;font-size:12px;">
+          Berdasarkan harga dan data nutrisi saat ini, setiap pengeluaran untuk <strong style="color:${best.color};">${best.label.toLowerCase()}</strong> 
+          menghasilkan <strong>${bestVsWorst.toFixed(1).replace(".", ",")}x lebih banyak protein</strong> dibandingkan ${worst.label.toLowerCase()}, 
+          serta <strong>${bestVsSecond.toFixed(1).replace(".", ",")}x lebih efisien</strong> dari ${second.label.toLowerCase()}. 
+          Hal ini mengonfirmasi bahwa memilih komoditas hanya berdasarkan harga per kilogram belum tentu memberikan nilai gizi per rupiah yang optimal.
+        </span>
+      </div>
+    </div>
+  `;
+}
   }
 
   /* ─── SCENE 6: DAYA BELI ─── */
