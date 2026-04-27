@@ -140,7 +140,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:cen
 .zone-ok{background:rgba(90,122,82,0.12);color:var(--sage);}
 
 /* TAKEAWAY */
-.takeaway-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+.takeaway-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
 .takeaway-card{background:rgba(255,255,255,0.09);border:1px solid rgba(255,255,255,0.18);border-radius:10px;padding:18px 16px;transition:background .2s,transform .2s;}
 .takeaway-card:hover{background:rgba(255,255,255,0.14);transform:translateY(-2px);}
 .takeaway-num{font-family:'Playfair Display',serif;font-size:40px;color:rgba(255,255,255,0.13);line-height:1;margin-bottom:6px;}
@@ -781,59 +781,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   <div class="container">
     <div class="reveal">
       <div class="eyebrow" style="color:var(--gold2);">Temuan dan Implikasi</div>
-      <h2 class="sec-title" style="color:var(--white);">Tiga hal yang<br><em style="color:var(--gold2);">perlu diketahui</em></h2>
-      <p class="sec-lead" style="color:rgba(253,250,244,0.72);">Data Jan 2024–Apr 2026 membentuk gambaran yang konsisten: ada ketimpangan struktural, ada pola yang dapat diprediksi, dan ada paradoks daya beli yang sering luput dari perhatian.</p>
+      <h2 class="sec-title" style="color:var(--white);">Empat hal yang<br><em style="color:var(--gold2);">perlu diketahui</em></h2>
     </div>
 
     <div class="takeaway-grid reveal">
       <div class="takeaway-card">
         <div class="takeaway-num">01</div>
-        <div class="takeaway-text"><strong>Telur adalah protein paling efisien per rupiah</strong>, menghasilkan 2,5x lebih banyak protein per Rp 1.000 dibanding sapi. Tapi di NTT, bebannya terhadap UMP tetap melampaui 21%.</div>
+        <div class="takeaway-text">Masyarakat dengan UMP di bawah Rp 3 juta mengalokasikan <strong style="color:var(--gold2);">lebih dari 40% pendapatan</strong> hanya untuk memenuhi kebutuhan protein harian minimal jika bergantung pada daging sapi. Telur menjadi satu-satunya pilihan yang realistis.</div>
       </div>
       <div class="takeaway-card">
         <div class="takeaway-num">02</div>
-        <div class="takeaway-text"><strong>Harga ayam adalah yang paling fluktuatif</strong>: amplitudo musiman 12,6% vs sapi 3,3%. Keluarga yang bergantung pada ayam menanggung ketidakpastian pengeluaran terbesar.</div>
+        <div class="takeaway-text">Dengan tren kenaikan sapi +5,4% dan telur +3% hingga akhir 2026, tekanan terhadap daya beli akan terus berlanjut. <strong style="color:var(--gold2);">Gap antar wilayah tidak ada tanda mereda</strong> tanpa intervensi distribusi yang struktural.</div>
       </div>
       <div class="takeaway-card">
         <div class="takeaway-num">03</div>
-        <div class="takeaway-text"><strong>Gap wilayah tidak ada tanda mereda</strong>: Kalimantan Selatan membayar sapi rata-rata 41% lebih mahal dari NTT, dan pola ini konsisten sepanjang 28 bulan data.</div>
+        <div class="takeaway-text">NTT membayar telur <strong style="color:var(--gold2);">21,3% UMP</strong>-nya untuk protein yang sama yang cukup dibayar DKI dengan 8,4% UMP. Bukan karena NTT lebih boros, tapi karena rantai distribusi pangan Indonesia masih belum merata.</div>
       </div>
-    </div>
-
-    <div class="forecast-badge reveal">
-      <span style="width:5px;height:5px;border-radius:50%;background:var(--gold2);display:inline-block;"></span>
-      PROYEKSI APR–DES 2026
-    </div>
-    <div class="chart-card reveal" style="background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.12);">
-      <div class="chart-label" style="color:rgba(253,250,244,0.45);">Tren aktual vs proyeksi naive seasonal — Daging Sapi dan Telur Ayam (Rp/kg)</div>
-      <div class="legend">
-        <span class="legend-item" style="color:rgba(253,250,244,0.65);"><span class="legend-dot" style="background:var(--sapi)"></span>Sapi aktual</span>
-        <span class="legend-item" style="color:rgba(253,250,244,0.65);"><span class="legend-dot" style="background:rgba(90,122,82,0.4);border:1px dashed var(--sapi);"></span>Sapi proyeksi</span>
-        <span class="legend-item" style="color:rgba(253,250,244,0.65);"><span class="legend-dot" style="background:var(--telur)"></span>Telur aktual</span>
-        <span class="legend-item" style="color:rgba(253,250,244,0.65);"><span class="legend-dot" style="background:rgba(196,82,42,0.4);border:1px dashed var(--telur);"></span>Telur proyeksi</span>
-      </div>
-      <div class="chart-area" style="height:230px;"><canvas id="c8"></canvas></div>
-    </div>
-
-    <!-- Insight cards -->
-    <div class="reveal" style="margin-top:20px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-        <div style="background:rgba(201,149,42,0.12);border:1px solid rgba(201,149,42,0.3);border-radius:12px;padding:20px 22px;">
-          <div style="font-family:'DM Mono',monospace;font-size:8.5px;color:var(--gold2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">💡 Insight Kunci</div>
-          <p style="font-size:12.5px;color:rgba(253,250,244,0.85);line-height:1.75;margin:0;">Masyarakat dengan UMP di bawah Rp 3 juta mengalokasikan <strong style="color:var(--gold2);">lebih dari 40% pendapatan</strong> hanya untuk memenuhi kebutuhan protein harian minimal jika bergantung pada daging sapi. Telur menjadi satu-satunya pilihan yang realistis.</p>
-        </div>
-        <div style="background:rgba(90,122,82,0.12);border:1px solid rgba(90,122,82,0.3);border-radius:12px;padding:20px 22px;">
-          <div style="font-family:'DM Mono',monospace;font-size:8.5px;color:var(--sage2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">📈 Proyeksi</div>
-          <p style="font-size:12.5px;color:rgba(253,250,244,0.85);line-height:1.75;margin:0;">Dengan tren kenaikan sapi +5,4% dan telur +3% hingga akhir 2026, tekanan terhadap daya beli akan terus berlanjut. <strong style="color:var(--sage2);">Gap antar wilayah tidak ada tanda mereda</strong> tanpa intervensi distribusi yang struktural.</p>
-        </div>
-        <div style="background:rgba(196,82,42,0.1);border:1px solid rgba(196,82,42,0.28);border-radius:12px;padding:20px 22px;">
-          <div style="font-family:'DM Mono',monospace;font-size:8.5px;color:var(--rust2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">⚖️ Paradoks Daya Beli</div>
-          <p style="font-size:12.5px;color:rgba(253,250,244,0.85);line-height:1.75;margin:0;">NTT membayar telur <strong style="color:var(--rust2);">21,3% UMP</strong>-nya untuk protein yang sama yang cukup dibayar DKI dengan 8,4% UMP. Bukan karena NTT lebih boros, tapi karena rantai distribusi pangan Indonesia masih belum merata.</p>
-        </div>
-        <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:20px 22px;">
-          <div style="font-family:'DM Mono',monospace;font-size:8.5px;color:rgba(253,250,244,0.45);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">🎯 Rekomendasi</div>
-          <p style="font-size:12.5px;color:rgba(253,250,244,0.85);line-height:1.75;margin:0;">Intervensi kebijakan paling berdampak: <strong style="color:var(--white);">efisiensi rantai distribusi telur di wilayah timur</strong>. Telur adalah komoditas paling efisien secara nutrisi, namun ketidakmerataan harganya memukul provinsi dengan UMP terendah paling keras.</p>
-        </div>
+      <div class="takeaway-card">
+        <div class="takeaway-num">04</div>
+        <div class="takeaway-text">Intervensi kebijakan paling berdampak: <strong style="color:var(--gold2);">efisiensi rantai distribusi telur di wilayah timur</strong>. Telur adalah komoditas paling efisien secara nutrisi, namun ketidakmerataan harganya memukul provinsi dengan UMP terendah paling keras.</div>
       </div>
     </div>
   </div>
