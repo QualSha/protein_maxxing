@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Protein Maxxing</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="logo.png">
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 :root {
@@ -95,6 +97,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:cen
 .legend-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 
 /* GRID */
+.grid1 { display: block; width: 100%; }
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
 
@@ -541,7 +544,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 
     <div id="land-sapi" class="tab-panel active reveal">
       <div class="grid2">
-        <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card" style="margin-bottom:1;">
           <div class="chart-label">Sebaran harga daging sapi antar provinsi (Rp/kg, Jan 2024–Apr 2026)</div>
           <div class="map-wrap" id="map-sapi-wrap"></div>
           <div class="choro-legend" style="margin-top:8px;">
@@ -550,16 +553,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
             <span class="choro-legend-label">Mahal</span>
           </div>
         </div>
-        <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card" style="margin-bottom:1;">
           <div class="chart-label">10 provinsi dengan harga tertinggi (Rp/kg)</div>
           <div class="chart-area" style="height:300px;"><canvas id="c2a"></canvas></div>
         </div>
       </div>
-      
+
     </div>
     <div id="land-ayam" class="tab-panel">
       <div class="grid2">
-        <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card" style="margin-bottom:1;">
           <div class="chart-label">Sebaran harga daging ayam antar provinsi (Rp/kg, Jan 2024–Apr 2026)</div>
           <div class="map-wrap" id="map-ayam-wrap"></div>
           <div class="choro-legend" style="margin-top:8px;">
@@ -568,15 +571,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
             <span class="choro-legend-label">Mahal</span>
           </div>
         </div>
-        <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card" style="margin-bottom:1;">
           <div class="chart-label">10 provinsi dengan harga tertinggi (Rp/kg)</div>
-          <div class="chart-area" style="height:240px;"><canvas id="c2b"></canvas></div>
+          <div class="chart-area" style="height:300px;"><canvas id="c2b"></canvas></div>
         </div>
       </div>
     </div>
     <div id="land-telur" class="tab-panel">
       <div class="grid2">
-        <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card" style="margin-bottom:1;">
           <div class="chart-label">Sebaran harga telur ayam antar provinsi (Rp/kg, Jan 2024–Apr 2026)</div>
           <div class="map-wrap" id="map-telur-wrap"></div>
           <div class="choro-legend" style="margin-top:8px;">
@@ -585,9 +588,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
             <span class="choro-legend-label">Mahal</span>
           </div>
         </div>
-        <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card" style="margin-bottom:1;">
           <div class="chart-label">10 provinsi dengan harga tertinggi (Rp/kg)</div>
-          <div class="chart-area" style="height:240px;"><canvas id="c2c"></canvas></div>
+          <div class="chart-area" style="height:300px;"><canvas id="c2c"></canvas></div>
         </div>
       </div>
     </div>
@@ -832,31 +835,35 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--rust);"></div>
         <div class="kpi-tag">Beban protein tertinggi</div>
-        <div class="kpi-val" id="afford-worst-val">-</div>
-        <div class="kpi-unit" id="afford-worst-unit">-</div>
-        <div class="afford-zone zone-red" style="margin-top:6px;">Rata-rata nasional</div>
+        <div class="kpi-val" id="afford-worst-daily">-</div> 
+        <div class="kpi-unit" id="afford-worst-desc">-</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-note" id="afford-worst-footer">-</div>
       </div>
+
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--gold);"></div>
         <div class="kpi-tag">Beban protein menengah</div>
-        <div class="kpi-val" id="afford-natavg-val">-</div>
-        <div class="kpi-unit" id="afford-natavg-unit">-</div>
+        <div class="kpi-val" id="afford-natavg-daily">-</div> 
+        <div class="kpi-unit" id="afford-natavg-desc">-</div>
         <div class="kpi-divider"></div>
-        <div class="kpi-note">Persentase UMP untuk memenuhi 60g protein/hari selama 30 hari</div>
+        <div class="kpi-note" id="afford-natavg-footer">-</div>
       </div>
+
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--sage);"></div>
         <div class="kpi-tag">Beban protein terendah</div>
-        <div class="kpi-val" id="afford-best-val">-</div>
-        <div class="kpi-unit" id="afford-best-unit">-</div>
-        <div class="afford-zone zone-ok" style="margin-top:6px;">Rata-rata nasional</div>
+        <div class="kpi-val" id="afford-best-daily">-</div> 
+        <div class="kpi-unit" id="afford-best-desc">-</div>
+        <div class="kpi-divider"></div>
+        <div class="kpi-note" id="afford-best-footer">-</div>
       </div>
     </div>
 
-    <div class="grid2 reveal">
+    <div class="grid1 reveal">
       <div class="chart-card" style="margin-bottom:0;">
         <div class="chart-label">10 provinsi dengan beban protein telur tertinggi (% UMP 2025, harga Apr 2026)</div>
-        <div class="chart-area" style="height:280px;"><canvas id="c7a"></canvas></div>
+        <div class="chart-area" style="height:240px;"><canvas id="c7a"></canvas></div>
       </div>
     </div>
 
@@ -883,7 +890,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       </div>
       <div class="takeaway-card">
         <div class="takeaway-num">02</div>
-        <div class="takeaway-text">Dengan tren kenaikan sapi +5,4% dan telur +3% hingga akhir 2026, tekanan terhadap daya beli akan terus berlanjut. <strong style="color:var(--gold2);">Gap antar wilayah tidak ada tanda mereda</strong> tanpa intervensi distribusi yang struktural.</div>
+        <div class="takeaway-text">Dengan kenaikan harga sapi +3,6% dan telur +9,4% secara year-on-year per April 2026, tekanan terhadap daya beli akan terus berlanjut. <strong style="color:var(--gold2);">Gap antar wilayah tidak ada tanda mereda</strong> tanpa intervensi distribusi yang struktural.</div>
       </div>
       <div class="takeaway-card">
         <div class="takeaway-num">03</div>
