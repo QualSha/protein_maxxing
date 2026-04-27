@@ -419,12 +419,19 @@
       },
       inequality: {
         scatter,
-        gap: Object.keys(COMMODITIES).map(k => ({
-          key: k,
-          label: COMMODITIES[k].label,
-          value: landscape[k].gap,
-          color: COMMODITIES[k].color
-        }))
+        gap: Object.keys(COMMODITIES).map(k => {
+          const sorted = [...latestRows].filter(r => r[k] > 0).sort((a, b) => b[k] - a[k]);
+          return {
+            key: k,
+            label: COMMODITIES[k].label,
+            value: landscape[k].gap,
+            min: sorted.at(-1)?.[k] ?? null,
+            minProvince: sorted.at(-1)?.province ?? null,
+            max: sorted[0]?.[k] ?? null,
+            maxProvince: sorted[0]?.province ?? null,
+            color: COMMODITIES[k].color
+          };
+        })
       },
       nutrition: {
         raw: raw.nutrisi,
