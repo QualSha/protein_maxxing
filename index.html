@@ -1046,6 +1046,7 @@ function buildSim() {
       }
     }
   });
+  
   function upd() {
     const ps = +document.getElementById('ps').value;
     const pa = +document.getElementById('pa').value;
@@ -1101,7 +1102,17 @@ window.toggleLegend = function(el) {
 
   chart.update();
 };
-
+window.switchKetimpanganTab = function(commodity, btn) {
+  // Update active tab button
+  if (btn && btn.closest('.tab-row')) {
+    btn.closest('.tab-row').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  // Re-render scatter plot dengan komoditas yang dipilih
+  if (window.ProteinSceneRenderer && window.PROTEIN_SCENE_DATA) {
+    ProteinSceneRenderer.renderKetimpanganByComodity(window.PROTEIN_SCENE_DATA, commodity);
+  }
+};
 window.addEventListener('DOMContentLoaded', () => {
   const sections = document.querySelectorAll('section[id]');
   const navDots = document.getElementById('navDots');
