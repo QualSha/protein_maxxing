@@ -274,6 +274,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 }
 .leaflet-tooltip.prot-tooltip::before { display: none !important; }
 
+/* Tambahan untuk Legenda Interaktif */
+.legend-item {
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+.legend-item.dimmed {
+  opacity: 0.35;
+  filter: grayscale(80%);
+}
+
 /* RESPONSIVE */
 @media(max-width:760px){
   .kpi-row,.grid2,.grid3,.takeaway-grid,.hero-kpi-row{grid-template-columns:1fr;}
@@ -291,6 +302,40 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script src="protein-data-processor.js"></script>
+
+<script>
+  // 1. PATCH DATA: Memperbaiki shift waktu agar akurat mulai Jan 2024
+  // Mencegat dari loadFromUrls agar dipastikan tereksekusi
+  const originalLoadFromUrls = ProteinData.loadFromUrls;
+  ProteinData.loadFromUrls = async function(paths, options) {
+    const result = await originalLoadFromUrls(paths, options);
+    
+    // Geser hari untuk kompensasi bug zona waktu Excel
+    result.raw.komoditas.forEach(r => {
+      if (r.date) {
+        let d = new Date(r.date);
+        d.setDate(d.getDate() + 1); 
+        r.date = d.toISOString().slice(0, 10);
+        r.month = r.date.slice(0, 7);
+      }
+    });
+    
+    // Buang secara paksa semua data sebelum Januari 2024
+    result.raw.komoditas = result.raw.komoditas.filter(r => r.month >= '2024-01');
+    
+    // Render ulang scene menggunakan data yang sudah bersih
+    result.scenes = ProteinData.buildSceneData(result.raw, options);
+    return result;
+  };
+
+  // 2. PATCH HOVER CHART: Memunculkan dot saat area tahun (sumbu x) di-hover
+  Chart.defaults.interaction.mode = 'index';
+  Chart.defaults.interaction.intersect = false;
+  Chart.defaults.elements.point.hoverRadius = 6;
+  Chart.defaults.elements.point.hoverBorderWidth = 2;
+  Chart.defaults.elements.point.hoverBackgroundColor = '#FFFFFF';
+</script>
+
 <script src="protein-scene-renderer.js"></script>
 <script src="app-from-excel.js"></script>
 <div id="progress"></div>
@@ -477,9 +522,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
         <div class="chart-card" style="margin-bottom:0;">
           <div class="chart-label">Harga rata-rata nasional — Jan 2024 s.d. Apr 2026 (Rp/kg)</div>
           <div class="legend">
-            <span class="legend-item"><span class="legend-dot" style="background:var(--sapi)"></span>Daging sapi</span>
-            <span class="legend-item"><span class="legend-dot" style="background:var(--ayam)"></span>Daging ayam</span>
-            <span class="legend-item"><span class="legend-dot" style="background:var(--telur)"></span>Telur ayam</span>
+            <span class="legend-item" data-group="sapi" onclick="toggleLegend(this)">
+              <span class="legend-dot" style="background:var(--sapi)"></span>Daging sapi
+            </span>
+            <span class="legend-item" data-group="ayam-telur" onclick="toggleLegend(this)">
+              <span class="legend-dot" style="background:var(--ayam)"></span>Daging ayam
+            </span>
+            <span class="legend-item" data-group="ayam-telur" onclick="toggleLegend(this)">
+              <span class="legend-dot" style="background:var(--telur)"></span>Telur ayam
+            </span>
           </div>
           <div class="chart-area" style="height:300px;"><canvas id="c3a"></canvas></div>
         </div>
@@ -1009,7 +1060,44 @@ function buildSim() {
   upd();
 }
 
+window.toggleLegend = function(el) {
+  // Ambil instance canvas chart di card ini
+  const chartId = el.closest('.chart-card').querySelector('canvas').id;
+  const chart = Chart.getChart(chartId);
+  if (!chart) return;
 
+  const group = el.dataset.group;
+  const allItems = el.parentElement.querySelectorAll('.legend-item');
+  
+  // Cek apakah tombol yang diklik saat ini adalah SATU-SATUNYA yang sedang aktif
+  const isActive = !el.classList.contains('dimmed') && 
+                   Array.from(allItems).some(item => item.classList.contains('dimmed'));
+
+  if (isActive) {
+    // ATURAN 3.4: Klik legenda yang sedang aktif -> Tampilkan Semua
+    allItems.forEach(item => item.classList.remove('dimmed'));
+    chart.data.datasets.forEach(ds => ds.hidden = false);
+  } else {
+    // ATURAN 3.3: Redupkan semua, lalu nyalakan sesuai grup yang diklik
+    allItems.forEach(item => {
+      if (item.dataset.group === group) item.classList.remove('dimmed');
+      else item.classList.add('dimmed');
+    });
+    
+    // ATURAN 3.1 & 3.2: Filter dataset yang muncul
+    chart.data.datasets.forEach((ds) => {
+      // Menggunakan nama label dataset ('Daging Sapi', 'Daging Ayam', dst)
+      const isSapi = ds.label.toLowerCase().includes('sapi');
+      
+      if (group === 'sapi') {
+        ds.hidden = !isSapi; // Hanya sapi yang false (ditampilkan)
+      } else if (group === 'ayam-telur') {
+        ds.hidden = isSapi;  // Sapi disembunyikan, sisanya (ayam & telur) ditampilkan
+      }
+    });
+  }
+  chart.update(); // Render ulang chart dengan kondisi terbaru
+};
 
 window.addEventListener('DOMContentLoaded', () => {
   const sections = document.querySelectorAll('section[id]');
