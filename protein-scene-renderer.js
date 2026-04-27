@@ -1299,8 +1299,7 @@ function renderHeroKPIs(scenes) {
       conclusionEl.innerHTML = conclusion;
     }
   }
-
-  /* ─── SCENE 5: NUTRISI ─── */
+/* ─── SCENE 5: NUTRISI ─── */
   function renderNutrisi(scenes) {
     const nutritionScene = scenes?.nutrition || {};
     const nutrisi = nutritionScene?.raw || {};
@@ -1315,29 +1314,108 @@ function renderHeroKPIs(scenes) {
       telur: Number(efficiency.telur?.proteinPerRp1000) || 3.7
     };
 
-    // Bar chart: protein per Rp 1000
-    const c6b = document.getElementById('c6b');
-    if (c6b && !chartInstances['c6b']) {
-      chartInstances['c6b'] = new Chart(c6b, {
-        type: 'bar',
-        data: {
-          labels: ['Daging Sapi','Daging Ayam','Telur Ayam'],
-          datasets: [{
-            data: [protPer1k.sapi, protPer1k.ayam, protPer1k.telur],
-            backgroundColor: [C.sapi, C.ayam, C.telur],
-            borderRadius: 4, borderWidth: 0
-          }]
+
+    const nutriCardsWrap = document.getElementById("nutri-waffle-cards");
+
+    if (nutriCardsWrap) {
+      const cards = [
+        {
+          label: "Daging Sapi",
+          color: C.sapi,
+          rows: [
+            ["Protein", Number(nutrisi.sapi?.protein) || 18.8, "18,8 g", 25],
+            ["Lemak", Number(nutrisi.sapi?.fat) || 14.0, "14,0 g", 25],
+            ["Kalori", Number(nutrisi.sapi?.calorie) || 201, "201 kal", 300],
+            ["Karbohidrat", Number(nutrisi.sapi?.carb) || 0, "0 g", 25]
+          ]
         },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.parsed.y.toFixed(2)+' g protein per Rp 1.000'}}},
-          scales: {
-            x: {ticks:{color:tick,font:{family:fnt,size:10}}, grid:{color:'transparent'}, border:{color:'transparent'}},
-            y: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>v.toFixed(1)+' g'}, grid:{color:grid}, border:{color:'transparent'},
-                title:{display:true,text:'gram protein per Rp 1.000',color:tick,font:{size:8.5,family:fnt}}}
-          }
+        {
+          label: "Daging Ayam",
+          color: C.ayam,
+          rows: [
+            ["Protein", Number(nutrisi.ayam?.protein) || 18.2, "18,2 g", 25],
+            ["Lemak", Number(nutrisi.ayam?.fat) || 25.0, "25,0 g", 25],
+            ["Kalori", Number(nutrisi.ayam?.calorie) || 298, "298 kal", 300],
+            ["Karbohidrat", Number(nutrisi.ayam?.carb) || 0, "0 g", 25]
+          ]
+        },
+        {
+          label: "Telur Ayam",
+          color: C.telur,
+          rows: [
+            ["Protein", Number(nutrisi.telur?.protein) || 12.4, "12,4 g", 25],
+            ["Lemak", Number(nutrisi.telur?.fat) || 10.8, "10,8 g", 25],
+            ["Kalori", Number(nutrisi.telur?.calorie) || 154, "154 kal", 300],
+            ["Karbohidrat", Number(nutrisi.telur?.carb) || 0.7, "0,7 g", 25]
+          ]
         }
+      ];
+
+      const makeWaffle = (value, max, color) => {
+        const total = 40;
+        const filled = Math.round((value / max) * total);
+
+        return `
+          <div class="nut-waffle-mini">
+            ${Array.from({ length: total }).map((_, i) => `
+              <div class="waffle-cell" style="
+                background:${i < filled ? color : 'var(--cream2)'};
+                opacity:${i < filled ? 1 : 0.55};
+              "></div>
+            `).join("")}
+          </div>
+        `;
+      };
+
+      nutriCardsWrap.innerHTML = cards.map(card => `
+        <div class="nut-waffle-card">
+          <div class="nut-waffle-title">
+            <span class="nut-waffle-dot" style="background:${card.color};"></span>
+            ${card.label}
+          </div>
+
+          ${card.rows.map(([name, value, label, max]) => `
+            <div class="nut-waffle-row">
+              <div class="nut-waffle-label">${name}</div>
+              ${makeWaffle(value, max, card.color)}
+              <div class="nut-waffle-val">${label}</div>
+            </div>
+          `).join("")}
+        </div>
+      `).join("");
+    }
+    // KPI -> Waffle (replaces KPI chart)
+    const kpiWaffleEl = document.getElementById("c6b-waffle");
+    if (kpiWaffleEl) {
+      const items = [
+        { key: "sapi",  label: "Daging Sapi",  val: protPer1k.sapi,  color: C.sapi },
+        { key: "ayam",  label: "Daging Ayam",  val: protPer1k.ayam,  color: C.ayam },
+        { key: "telur", label: "Telur Ayam",   val: protPer1k.telur, color: C.telur }
+      ].sort((a, b) => b.val - a.val);
+
+      const max = Math.max(...items.map(d => d.val), 1);
+      let html = `<div style="font-size:10px;color:var(--text3);margin-bottom:10px;">
+        Tiap baris = 50 sel (skala relatif terhadap komoditas paling efisien).
+      </div>`;
+
+      items.forEach(item => {
+        const filled = Math.max(0, Math.min(50, Math.round((item.val / max) * 50)));
+        html += `<div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;gap:14px;align-items:baseline;margin-bottom:6px;">
+            <div style="font-size:11px;color:var(--text2);"><strong>${item.label}</strong></div>
+            <div style="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--brown);">
+              ${item.val.toFixed(2)} g / Rp 1.000
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(25,1fr);gap:2px;max-width:260px;">
+            ${Array.from({ length: 50 }).map((_, i) =>
+              `<div class="waffle-cell" style="background:${item.color};opacity:${i < filled ? 1 : 0.16};"></div>`
+            ).join("")}
+          </div>
+        </div>`;
       });
+
+      kpiWaffleEl.innerHTML = html;
     }
 
     // Waffle chart efisiensi per Rp10.000
@@ -1410,43 +1488,179 @@ function renderHeroKPIs(scenes) {
       nutCardWaffle.innerHTML = html;
     }
 
-    // Waffle simulasi uang X: berapa gram produk & protein didapat
-    const moneySlider = document.getElementById("money-budget");
-    const moneyLabel = document.getElementById("money-budget-label");
-    const moneyWaffle = document.getElementById("money-waffle-wrap");
-    if (moneySlider && moneyLabel && moneyWaffle) {
-      const base = [
-        { key: "sapi", label: "Daging Sapi", color: C.sapi, price: Number(efficiency.sapi?.pricePerKg) || 145000, protein100: Number(nutrisi.sapi?.protein) || 18.8 },
-        { key: "ayam", label: "Daging Ayam", color: C.ayam, price: Number(efficiency.ayam?.pricePerKg) || 42000, protein100: Number(nutrisi.ayam?.protein) || 18.2 },
-        { key: "telur", label: "Telur Ayam", color: C.telur, price: Number(efficiency.telur?.pricePerKg) || 33000, protein100: Number(nutrisi.telur?.protein) || 12.4 }
+// Budget belanja: tampilkan banyak komoditas yang didapat dalam bar skala tetap 1 kg
+const moneySlider = document.getElementById("money-budget");
+const moneyLabel = document.getElementById("money-budget-label");
+const moneyQtyWrap = document.getElementById("money-qty-wrap");
+
+if (moneySlider && moneyLabel && moneyQtyWrap) {
+  moneySlider.min = 10000;
+  moneySlider.max = 150000;
+  moneySlider.step = 5000;
+
+  const base = [
+    {
+      key: "sapi",
+      label: "Daging Sapi",
+      color: C.sapi,
+      proteinColor: "var(--sage3)",
+      price: Number(efficiency.sapi?.pricePerKg) || 145000,
+      protein100: Number(nutrisi.sapi?.protein) || 18.8
+    },
+    {
+      key: "ayam",
+      label: "Daging Ayam",
+      color: C.ayam,
+      proteinColor: "var(--gold3)",
+      price: Number(efficiency.ayam?.pricePerKg) || 42000,
+      protein100: Number(nutrisi.ayam?.protein) || 18.2
+    },
+    {
+      key: "telur",
+      label: "Telur Ayam",
+      color: C.telur,
+      proteinColor: "var(--rust2)",
+      price: Number(efficiency.telur?.pricePerKg) || 33000,
+      protein100: Number(nutrisi.telur?.protein) || 12.4
+    }
+  ];
+
+  const formatGram = value => Math.round(value).toLocaleString("id-ID");
+  const formatProtein = value => value.toFixed(1).replace(".", ",");
+
+  const updateMoney = () => {
+    const money = Number(moneySlider.value || 50000);
+    moneyLabel.textContent = "Rp " + money.toLocaleString("id-ID");
+
+    const scaleMax = 1000; // fixed: 1 kg
+
+    const computed = base.map(item => {
+      const grams = (money / item.price) * 1000;
+      const proteinGram = (grams / 100) * item.protein100;
+
+      return { ...item, grams, proteinGram };
+    });
+
+    let html = `
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">
+        Estimasi yang didapat jika seluruh budget dibelikan satu komoditas.
+        Skala bar tetap: 0–1.000 g.
+      </div>
+
+      <div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-bottom:12px;">
+        <span>
+          <span style="display:inline-block;width:8px;height:8px;background:var(--brown);margin-right:4px;border-radius:2px;"></span>
+          Berat
+        </span>
+        <span>
+          <span style="display:inline-block;width:8px;height:8px;background:var(--gold2);margin-right:4px;border-radius:2px;"></span>
+          Protein
+        </span>
+      </div>
+    `;
+
+    computed.forEach(item => {
+      const weightPct = Math.min((item.grams / scaleMax) * 100, 100);
+      const proteinPct = Math.min((item.proteinGram / scaleMax) * 100, 100);
+
+      html += `
+        <div style="border:1px solid var(--line2);border-radius:10px;padding:12px 14px;background:var(--white);margin-bottom:10px;">
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+            <span style="font-size:11.5px;">
+              <strong style="color:${item.color};">${item.label}</strong>
+            </span>
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--brown);">
+              ${formatGram(item.grams)} g
+            </span>
+          </div>
+
+          <div style="position:relative;height:14px;border-radius:999px;overflow:hidden;background:var(--cream2);margin-bottom:8px;">
+
+            <div style="
+              position:absolute;
+              left:0;
+              top:0;
+              height:100%;
+              width:${weightPct}%;
+              background:${item.color};
+            "></div>
+
+            <div style="
+              position:absolute;
+              left:0;
+              top:0;
+              height:100%;
+              width:${proteinPct}%;
+              background:${item.proteinColor};
+            "></div>
+
+          </div>
+
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);line-height:1.55;">
+            <span>Berat: <strong style="color:var(--brown);">${formatGram(item.grams)} g</strong></span>
+            <span>Protein: <strong style="color:var(--brown);">${formatProtein(item.proteinGram)} g</strong></span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);line-height:1.55;">
+            <span>Harga</span>
+            <span style="font-family:'DM Mono',monospace;color:var(--text2);">
+              Rp ${Math.round(item.price).toLocaleString("id-ID")}/kg
+            </span>
+          </div>
+
+        </div>
+      `;
+    });
+
+    moneyQtyWrap.innerHTML = html;
+  };
+
+  if (!moneySlider.dataset.bound) {
+    moneySlider.addEventListener("input", updateMoney);
+    moneySlider.dataset.bound = "1";
+  }
+
+  updateMoney();
+}
+    // "Chart 3 komoditas" -> waffle gabungan (komposisi efisiensi protein)
+    const simWaffleEl = document.getElementById("sim-waffle-wrap");
+    if (simWaffleEl) {
+      const items = [
+        { key: "sapi", label: "Daging Sapi", color: C.sapi, val: protPer1k.sapi },
+        { key: "ayam", label: "Daging Ayam", color: C.ayam, val: protPer1k.ayam },
+        { key: "telur", label: "Telur Ayam", color: C.telur, val: protPer1k.telur }
       ];
-      const updateMoney = () => {
-        const money = Number(moneySlider.value || 50000);
-        moneyLabel.textContent = "Rp " + money.toLocaleString("id-ID");
-        let html = `<div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Estimasi yang didapat jika seluruh budget dibelikan satu komoditas (tiap sel = 10g bahan).</div>`;
-        base.forEach(item => {
-          const grams = (money / item.price) * 1000;
-          const proteinGram = (grams / 100) * item.protein100;
-          const filled = Math.max(0, Math.min(100, Math.round(grams / 10)));
-          html += `<div style="margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--text2);margin-bottom:6px;">
-              <span><strong>${item.label}</strong></span>
-              <span>${Math.round(grams).toLocaleString("id-ID")} g · ${proteinGram.toFixed(1).replace(".",",")} g protein</span>
-            </div>
-            <div class="waffle-grid" style="max-width:260px;">
-              ${Array.from({ length: 100 }).map((_, i) =>
-                `<div class="waffle-cell" style="background:${item.color};opacity:${i < filled ? 1 : 0.18};"></div>`
-              ).join("")}
-            </div>
-          </div>`;
-        });
-        moneyWaffle.innerHTML = html;
-      };
-      if (!moneySlider.dataset.bound) {
-        moneySlider.addEventListener("input", updateMoney);
-        moneySlider.dataset.bound = "1";
-      }
-      updateMoney();
+      const total = items.reduce((a, b) => a + (Number(b.val) || 0), 0) || 1;
+
+      // 100 cells total (percentage composition)
+      const parts = items.map(d => ({ ...d, count: Math.round((d.val / total) * 100) }))
+        .sort((a, b) => b.val - a.val);
+      let sum = parts.reduce((a, b) => a + b.count, 0);
+      while (sum > 100) { parts[0].count -= 1; sum -= 1; }
+      while (sum < 100) { parts[0].count += 1; sum += 1; }
+
+      const cells = [];
+      parts.forEach(p => { for (let i = 0; i < p.count; i++) cells.push(p); });
+      while (cells.length < 100) cells.push({ label: "", color: "var(--cream3)" });
+      cells.length = 100;
+
+      simWaffleEl.innerHTML = `
+        <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">
+          Proporsi warna = porsi <strong>efisiensi protein per Rp 1.000</strong> (baseline Apr 2026).
+        </div>
+        <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:10px;">
+          ${parts.map(p => `
+            <span style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text2);">
+              <span style="width:9px;height:9px;border-radius:2px;background:${p.color};display:inline-block;"></span>
+              ${p.label} <span style="font-family:'DM Mono',monospace;color:var(--text3);">(${p.count}%)</span>
+            </span>
+          `).join("")}
+        </div>
+        <div class="waffle-grid" style="max-width:260px;">
+          ${cells.map(c => `<div class="waffle-cell" style="background:${c.color};opacity:0.95;" title="${c.label || ""}"></div>`).join("")}
+        </div>
+      `;
     }
 
     // Insight teks efisiensi

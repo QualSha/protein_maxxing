@@ -285,6 +285,117 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   filter: grayscale(80%);
 }
 
+.nut-waffle-card{
+  background:var(--white);
+  border:1px solid var(--line2);
+  border-radius:12px;
+  padding:16px 18px;
+  box-shadow:0 2px 8px rgba(92,61,30,0.04);
+}
+
+.nut-waffle-title{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:12px;
+  font-weight:700;
+  color:var(--brown);
+  margin-bottom:14px;
+}
+
+.nut-waffle-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+}
+
+.nut-waffle-row{
+  display:grid;
+  grid-template-columns:82px 1fr 58px;
+  align-items:center;
+  gap:8px;
+  margin-bottom:9px;
+}
+
+.nut-waffle-label{
+  font-size:11px;
+  color:var(--text2);
+}
+
+.nut-waffle-mini{
+  display:grid;
+  grid-template-columns:repeat(20,1fr);
+  gap:2px;
+}
+
+.nut-waffle-val{
+  font-family:'DM Mono',monospace;
+  font-size:10.5px;
+  color:var(--text2);
+  text-align:right;
+}
+
+.money-stack-list{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.money-stack-card{
+  border:1px solid var(--line2);
+  border-radius:10px;
+  padding:12px 14px;
+  background:rgba(253,250,244,.72);
+}
+
+.money-stack-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
+}
+
+.money-stack-name{
+  font-size:12px;
+  font-weight:700;
+}
+
+.money-stack-total{
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  color:var(--brown);
+  font-weight:600;
+}
+
+.money-stack-bar{
+  display:flex;
+  height:13px;
+  border-radius:999px;
+  overflow:hidden;
+  background:var(--cream2);
+  margin-bottom:8px;
+}
+
+.money-stack-weight{
+  background:var(--color);
+}
+
+.money-stack-protein{
+  background:color-mix(in srgb, var(--color) 45%, var(--cream2));
+}
+
+.money-stack-meta{
+  display:flex;
+  justify-content:space-between;
+  font-size:10.5px;
+  color:var(--text3);
+}
+
+.money-stack-meta strong{
+  color:var(--brown);
+  font-family:'DM Mono',monospace;
+}
+
 /* RESPONSIVE */
 @media(max-width:760px){
   .kpi-row,.grid2,.grid3,.takeaway-grid,.hero-kpi-row{grid-template-columns:1fr;}
@@ -677,94 +788,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   <div class="section-inner">
   <div class="container">
     <div class="reveal">
-      <div class="eyebrow">Nilai Gizi per Rupiah</div>
+      <div class="eyebrow">Scene 05 — Nilai Gizi per Rupiah</div>
       <h2 class="sec-title">Bukan soal harga,<br>soal <em>nilai gizinya</em></h2>
       <p class="sec-lead">Ketika harga naik, yang berubah bukan hanya pengeluaran: efisiensi nutrisi per rupiah juga berubah. Komoditas termurah belum tentu yang paling efisien untuk memenuhi kebutuhan protein harian.</p>
     </div>
 
-    <div class="tab-row reveal">
-      <button class="tab-btn active" onclick="switchTab('nut','100g',this)">Kandungan per 100g</button>
-      <button class="tab-btn" onclick="switchTab('nut','rp',this)">Efisiensi per Rp 1.000</button>
-      <button class="tab-btn" onclick="switchTab('nut','sim',this)">Simulasi Harga</button>
+    <div id="nut-rp" class="reveal" style="margin-top:14px;">
+      <div class="grid3" id="nutri-waffle-cards"></div>
+
+      <div class="insight" style="margin-top:10px;" id="nut-rp-insight">
+        -
+      </div>
     </div>
 
-    <div id="nut-100g" class="tab-panel active reveal">
-      <div class="grid3">
-        <div class="nut-card">
-          <div class="nut-card-title"><span class="nut-dot" style="background:var(--sapi);"></span>Daging Sapi</div>
-          <div class="nbar-wrap">
-            <div class="nbar-row"><span class="nbar-label">Protein</span><div class="nbar-track"><div class="nbar-fill" style="width:69%;background:var(--sapi);"></div></div><span class="nbar-val">18,8 g</span></div>
-            <div class="nbar-row"><span class="nbar-label">Lemak</span><div class="nbar-track"><div class="nbar-fill" style="width:56%;background:var(--sage2);"></div></div><span class="nbar-val">14,0 g</span></div>
-            <div class="nbar-row"><span class="nbar-label">Kalori</span><div class="nbar-track"><div class="nbar-fill" style="width:66%;background:var(--cream3);"></div></div><span class="nbar-val">201 kal</span></div>
-            <div class="nbar-row"><span class="nbar-label">Karbohidrat</span><div class="nbar-track"><div class="nbar-fill" style="width:0%;background:var(--sapi);"></div></div><span class="nbar-val">0 g</span></div>
-          </div>
-        </div>
-        <div class="nut-card">
-          <div class="nut-card-title"><span class="nut-dot" style="background:var(--ayam);"></span>Daging Ayam</div>
-          <div class="nbar-wrap">
-            <div class="nbar-row"><span class="nbar-label">Protein</span><div class="nbar-track"><div class="nbar-fill" style="width:67%;background:var(--ayam);"></div></div><span class="nbar-val">18,2 g</span></div>
-            <div class="nbar-row"><span class="nbar-label">Lemak</span><div class="nbar-track"><div class="nbar-fill" style="width:100%;background:var(--gold2);"></div></div><span class="nbar-val">25,0 g</span></div>
-            <div class="nbar-row"><span class="nbar-label">Kalori</span><div class="nbar-track"><div class="nbar-fill" style="width:98%;background:var(--cream3);"></div></div><span class="nbar-val">298 kal</span></div>
-            <div class="nbar-row"><span class="nbar-label">Karbohidrat</span><div class="nbar-track"><div class="nbar-fill" style="width:0%;background:var(--ayam);"></div></div><span class="nbar-val">0 g</span></div>
-          </div>
-        </div>
-        <div class="nut-card">
-          <div class="nut-card-title"><span class="nut-dot" style="background:var(--telur);"></span>Telur Ayam</div>
-          <div class="nbar-wrap">
-            <div class="nbar-row"><span class="nbar-label">Protein</span><div class="nbar-track"><div class="nbar-fill" style="width:46%;background:var(--telur);"></div></div><span class="nbar-val">12,4 g</span></div>
-            <div class="nbar-row"><span class="nbar-label">Lemak</span><div class="nbar-track"><div class="nbar-fill" style="width:43%;background:var(--rust2);"></div></div><span class="nbar-val">10,8 g</span></div>
-            <div class="nbar-row"><span class="nbar-label">Kalori</span><div class="nbar-track"><div class="nbar-fill" style="width:52%;background:var(--cream3);"></div></div><span class="nbar-val">154 kal</span></div>
-            <div class="nbar-row"><span class="nbar-label">Karbohidrat</span><div class="nbar-track"><div class="nbar-fill" style="width:2.5%;background:var(--telur);"></div></div><span class="nbar-val">0,7 g</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="chart-card" style="margin-top:12px;margin-bottom:0;">
-        <div class="chart-label">Waffle komposisi nutrisi per komoditas (per 100g)</div>
-        <div id="nut-card-waffle"></div>
-      </div>
-      <div class="insight" style="margin-top:10px;">Secara absolut, ayam dan sapi hampir setara dalam kandungan protein per 100g: keduanya sekitar 18–19g. Telur lebih rendah per 100g, tapi kisah sesungguhnya baru terlihat saat dilihat per rupiah.</div>
-    </div>
-
-    <div id="nut-rp" class="tab-panel">
-      <div class="grid2">
-        <div class="chart-card" style="margin-bottom:0;">
-          <div class="chart-label">Protein yang didapat per Rp 1.000 (gram)</div>
-          <div class="chart-area" style="height:240px;"><canvas id="c6b"></canvas></div>
-        </div>
-        <div class="chart-card" style="margin-bottom:0;">
-          <div class="chart-label">Komposisi protein vs biaya: waffle chart (per Rp 10.000)</div>
-          <div id="waffle-wrap" style="margin-top:8px;"></div>
-        </div>
-      </div>
-      <div class="insight" style="margin-top:10px;" id="nut-rp-insight">Dengan harga Apr 2026, setiap Rp 1.000 untuk telur menghasilkan protein yang jauh lebih banyak dibanding daging sapi.</div>
-    </div>
-
-    <div id="nut-sim" class="tab-panel">
-      <div class="grid2">
-        <div class="chart-card" style="margin-bottom:0;">
-          <div class="chart-label">Simulasi harga komoditas</div>
-          <div class="grid3" style="margin-bottom:14px;">
-            <div>
-              <div style="font-size:8.5px;color:var(--sapi);font-family:'DM Mono',monospace;font-weight:500;margin-bottom:4px;letter-spacing:.05em;">SAPI (Rp/kg)</div>
-              <input type="range" min="100000" max="200000" step="1000" value="145000" id="ps">
-              <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--brown);margin-top:3px;" id="ls">Rp 145.000</div>
-              <div style="font-size:10px;color:var(--text3);margin-top:3px;" id="gs">Total: - g</div>
-            </div>
-            <div>
-              <div style="font-size:8.5px;color:var(--ayam);font-family:'DM Mono',monospace;font-weight:500;margin-bottom:4px;letter-spacing:.05em;">AYAM (Rp/kg)</div>
-              <input type="range" min="25000" max="60000" step="500" value="42000" id="pa">
-              <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--brown);margin-top:3px;" id="la">Rp 42.000</div>
-              <div style="font-size:10px;color:var(--text3);margin-top:3px;" id="ga">Total: - g</div>
-            </div>
-            <div>
-              <div style="font-size:8.5px;color:var(--telur);font-family:'DM Mono',monospace;font-weight:500;margin-bottom:4px;letter-spacing:.05em;">TELUR (Rp/kg)</div>
-              <input type="range" min="20000" max="45000" step="500" value="33000" id="pt">
-              <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--brown);margin-top:3px;" id="lt">Rp 33.000</div>
-              <div style="font-size:10px;color:var(--text3);margin-top:3px;" id="gt">Total: - g</div>
-            </div>
-          </div>
-          <div class="chart-area" style="height:210px;"><canvas id="c6s"></canvas></div>
-        </div>
+    <div id="nut-sim" class="reveal" style="margin-top:14px;">
         <div class="chart-card" style="margin-bottom:0;">
           <div class="chart-label">Dengan uang sebanyak X, dapat berapa banyak komoditas?</div>
           <div style="margin-bottom:10px;">
@@ -772,9 +809,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
             <input type="range" min="10000" max="200000" step="5000" value="50000" id="money-budget">
             <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--brown);margin-top:3px;" id="money-budget-label">Rp 50.000</div>
           </div>
-          <div id="money-waffle-wrap" style="font-size:11px;"></div>
+          <div id="money-qty-wrap" style="font-size:11px;"></div>
         </div>
-      </div>
     </div>
   </div>
   </div>
