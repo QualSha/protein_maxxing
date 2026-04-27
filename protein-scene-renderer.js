@@ -895,17 +895,21 @@ function fmtRpNumber(v) {
   if (v == null || isNaN(Number(v))) return "-";
   return Math.round(Number(v)).toLocaleString("id-ID");
 }
-function renderHeroKPIs(scenes) {
-  const hero = scenes?.hero || [];
 
-  hero.forEach(item => {
-    const key = item.key; // sapi / ayam / telur
+  function renderHeroKPIs(scenes) {
+    const hero = scenes?.hero || [];
 
-    setText(`hero-${key}-val`, fmtRpNumber(item.value));
-    setText(`hero-${key}-sub`, `${item.unit} · nasional ${scenes.meta?.latestLabel || item.month}`);
-    setText(`hero-${key}-yoy`, fmtPct(item.yoyPct));
-  });
-}
+    hero.forEach(item => {
+      const key = item.key; // sapi / ayam / telur
+
+      setText(`hero-${key}-val`, fmtRpNumber(item.value));
+      setText(`hero-${key}-sub`, `${item.unit} · nasional ${scenes.meta?.latestLabel || item.month}`);
+      
+      // Mengambil format persentase, lalu menambahkan " YoY" jika datanya valid
+      const pctStr = fmtPct(item.yoyPct);
+      setText(`hero-${key}-yoy`, pctStr !== "-" ? pctStr + " YoY" : "-");
+    });
+  }
 
   function renderSeasonalHeatmap(scenes) {
     const el = document.getElementById("heatmap-wrap");
