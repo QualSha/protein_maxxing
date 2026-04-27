@@ -1409,31 +1409,9 @@ function renderHeroKPIs(scenes) {
       });
     }
 
-    // Donut chart dihapus, ganti ringkasan beban per komoditas
-    const donutWrap = document.getElementById('afford-donut-wrap');
-    if (donutWrap) {
-      if (chartInstances['c7b']) {
-        chartInstances['c7b'].destroy();
-        delete chartInstances['c7b'];
-      }
-      donutWrap.innerHTML = `<div style="width:100%;display:flex;flex-direction:column;gap:12px;">
-        ${sortedAvg.map(item => `
-          <div style="padding:12px 14px;border:1px solid var(--line2);border-radius:8px;background:var(--white);">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px;">
-              <span style="font-size:11.5px;color:var(--text2);">${item.label}</span>
-              <strong style="font-family:'DM Mono',monospace;color:var(--brown);">${item.value.toFixed(1).replace(".", ",")}% UMP</strong>
-            </div>
-            <div style="height:6px;background:var(--cream2);border-radius:4px;overflow:hidden;">
-              <div style="height:6px;background:${item.color};width:${Math.min(item.value, 60) / 60 * 100}%;"></div>
-            </div>
-          </div>
-        `).join("")}
-        <div style="font-size:10px;color:var(--text3);line-height:1.5;">Rata-rata nasional kebutuhan biaya untuk memenuhi 60g protein/hari selama 30 hari, dibanding UMP 2025.</div>
-      </div>`;
-    }
   }
 
-  /* ─── SCENE 7: FORECAST ─── */
+  /* FORECAST */
   function renderForecast(scenes) {
     const monthly = scenes?.trend?.monthly || [];
     const C = COLORS;
