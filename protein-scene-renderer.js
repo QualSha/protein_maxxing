@@ -1488,53 +1488,70 @@ function renderHeroKPIs(scenes) {
     // Bar chart top 10 provinsi
     const c7a = document.getElementById('c7a');
     if (c7a && !chartInstances['c7a']) {
-      chartInstances['c7a'] = new Chart(c7a, {
+        
+        const dataSapi = affLabels.map(prov => {
+            const d = (aff.sapi || []).find(item => item.prov === prov);
+            return d ? d.percentUMP : 44.6; 
+        });
+
+        const dataAyam = affLabels.map(prov => {
+            const d = (aff.ayam || []).find(item => item.prov === prov);
+            return d ? d.percentUMP : 13.5;
+        });
+
+        chartInstances['c7a'] = new Chart(c7a, {
         type: 'bar',
         data: {
-          labels: affLabels,
-          datasets: [{
-            data: affVals,
-            backgroundColor: affVals.map(v => v >= 20 ? 'rgba(196,82,42,0.82)' : v >= 18 ? 'rgba(201,149,42,0.75)' : 'rgba(90,122,82,0.65)'),
-            borderWidth: 0, borderRadius: 3
-          }]
+            labels: affLabels,
+            datasets: [{
+                label: 'Telur Ayam',
+                data: affVals,
+                extraSapi: dataSapi,
+                extraAyam: dataAyam,
+                backgroundColor: 'rgba(201,149,42,0.75)',
+                borderWidth: 0, 
+                borderRadius: 4,
+                barPercentage: 0.85,      
+                categoryPercentage: 0.9,
+            }]
         },
         options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.parsed.x.toFixed(1)+'% UMP untuk penuhi 60g protein/hari'}}},
-          indexAxis: 'y',
-          scales: {
-            x: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>v+'%'}, grid:{color:grid}, border:{color:'transparent'}, max:25},
-            y: {ticks:{color:tick,font:{family:fnt,size:9}}, grid:{color:'transparent'}, border:{color:'transparent'}}
-          }
-        }
-      });
-    }
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(45, 36, 26, 0.95)',
+                    padding: 12,
+                    callbacks: {
+                        title: (ctx) => `Prov. ${ctx[0].label}`,
+                        label: (ctx) => {
+                            // Ambil data asli (Telur)
+                            const telurVal = ctx.parsed.y.toFixed(1);
+                            // Ambil data extra dari dataset yang sama pakai index yang pas
+                            const idx = ctx.dataIndex;
+                            const sapiVal = ctx.dataset.extraSapi[idx].toFixed(1);
+                            const ayamVal = ctx.dataset.extraAyam[idx].toFixed(1);
 
-    // Donut chart dihapus, ganti ringkasan beban per komoditas
-    const donutWrap = document.getElementById('afford-donut-wrap');
-    if (donutWrap) {
-      if (chartInstances['c7b']) {
-        chartInstances['c7b'].destroy();
-        delete chartInstances['c7b'];
-      }
-      donutWrap.innerHTML = `<div style="width:100%;display:flex;flex-direction:column;gap:12px;">
-        ${sortedAvg.map(item => `
-          <div style="padding:12px 14px;border:1px solid var(--line2);border-radius:8px;background:var(--white);">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px;">
-              <span style="font-size:11.5px;color:var(--text2);">${item.label}</span>
-              <strong style="font-family:'DM Mono',monospace;color:var(--brown);">${item.value.toFixed(1).replace(".", ",")}% UMP</strong>
-            </div>
-            <div style="height:6px;background:var(--cream2);border-radius:4px;overflow:hidden;">
-              <div style="height:6px;background:${item.color};width:${Math.min(item.value, 60) / 60 * 100}%;"></div>
-            </div>
-          </div>
-        `).join("")}
-        <div style="font-size:10px;color:var(--text3);line-height:1.5;">Rata-rata nasional kebutuhan biaya untuk memenuhi 60g protein/hari selama 30 hari, dibanding UMP 2025.</div>
-      </div>`;
-    }
+                            return [
+                                `🥩 Daging Sapi: ${sapiVal}% UMP (Bandingan)`,
+                                `🍗 Daging Ayam: ${ayamVal}% UMP (Bandingan)`,
+                                `🥚 Telur Ayam: ${telurVal}% UMP`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: tick, font: { family: fnt, size: 9 } }, grid: { display: false }, border: { color: 'transparent' } },
+                y: { ticks: { color: tick, font: { family: fnt, size: 9 }, callback: v => v + '%' }, grid: { color: grid }, border: { color: 'transparent' }, max: 25 }
+            }
+        }
+    });
+    } 
   }
 
-  /* ─── SCENE 7: FORECAST ─── */
+  /* FORECAST */
   function renderForecast(scenes) {
     const monthly = scenes?.trend?.monthly || [];
     const C = COLORS;
