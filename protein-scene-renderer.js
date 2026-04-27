@@ -1502,26 +1502,26 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
     {
       key: "sapi",
       label: "Daging Sapi",
-      color: C.sapi,
+      color: "var(--sapi)",
       proteinColor: "var(--sage3)",
-      price: Number(efficiency.sapi?.pricePerKg) || 145000,
-      protein100: Number(nutrisi.sapi?.protein) || 18.8
+      price: Number(efficiency?.sapi?.pricePerKg) || 145000,
+      protein100: Number(nutrisi?.sapi?.protein) || 18.8
     },
     {
       key: "ayam",
       label: "Daging Ayam",
-      color: C.ayam,
+      color: "var(--ayam)",
       proteinColor: "var(--gold3)",
-      price: Number(efficiency.ayam?.pricePerKg) || 42000,
-      protein100: Number(nutrisi.ayam?.protein) || 18.2
+      price: Number(efficiency?.ayam?.pricePerKg) || 42000,
+      protein100: Number(nutrisi?.ayam?.protein) || 18.2
     },
     {
       key: "telur",
       label: "Telur Ayam",
-      color: C.telur,
+      color: "var(--telur)",
       proteinColor: "var(--rust2)",
-      price: Number(efficiency.telur?.pricePerKg) || 33000,
-      protein100: Number(nutrisi.telur?.protein) || 12.4
+      price: Number(efficiency?.telur?.pricePerKg) || 33000,
+      protein100: Number(nutrisi?.telur?.protein) || 12.4
     }
   ];
 
@@ -1537,24 +1537,26 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
     const computed = base.map(item => {
       const grams = (money / item.price) * 1000;
       const proteinGram = (grams / 100) * item.protein100;
-
       return { ...item, grams, proteinGram };
     });
 
     let html = `
-      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">
-        Estimasi yang didapat jika seluruh budget dibelikan satu komoditas.
-        Skala bar tetap: 0–1.000 g.
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;line-height:1.5;"> 
+        <br>Skala bar maksimal: <strong>1.000 g (1 kg)</strong>.
       </div>
 
-      <div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-bottom:12px;">
-        <span>
-          <span style="display:inline-block;width:8px;height:8px;background:var(--brown);margin-right:4px;border-radius:2px;"></span>
-          Berat
+      <div style="display:flex;gap:16px;font-size:10px;color:var(--text3);margin-bottom:14px;background:var(--white);padding:8px 12px;border-radius:6px;border:1px solid var(--line2);">
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:12px;height:12px;background:var(--cream);border:2px solid var(--text3);border-radius:3px;"></span>
+          Porsi Protein
         </span>
-        <span>
-          <span style="display:inline-block;width:8px;height:8px;background:var(--gold2);margin-right:4px;border-radius:2px;"></span>
-          Protein
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:12px;height:12px;background:var(--text3);border-radius:3px;"></span>
+          Total Berat
+        </span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:12px;height:12px;background:var(--cream2);border-radius:3px;"></span>
+          Kapasitas
         </span>
       </div>
     `;
@@ -1562,21 +1564,25 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
     computed.forEach(item => {
       const weightPct = Math.min((item.grams / scaleMax) * 100, 100);
       const proteinPct = Math.min((item.proteinGram / scaleMax) * 100, 100);
+      
+      // Indikator teks jika melebihi 1kg
+      const overLimit = item.grams > scaleMax;
+      const weightColor = overLimit ? "var(--rust)" : "var(--brown)";
 
       html += `
-        <div style="border:1px solid var(--line2);border-radius:10px;padding:12px 14px;background:var(--white);margin-bottom:10px;">
+        <div style="border:1px solid var(--line2);border-radius:10px;padding:14px;background:var(--white);margin-bottom:12px;box-shadow:0 2px 6px rgba(92,61,30,0.03);">
 
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
-            <span style="font-size:11.5px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:12px;">
               <strong style="color:${item.color};">${item.label}</strong>
             </span>
-            <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--brown);">
-              ${formatGram(item.grams)} g
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:${weightColor};font-weight:600;">
+              ${formatGram(item.grams)} g ${overLimit ? " ⚠️" : ""}
             </span>
           </div>
 
-          <div style="position:relative;height:14px;border-radius:999px;overflow:hidden;background:var(--cream2);margin-bottom:8px;">
-
+          <div style="position:relative;height:18px;border-radius:9px;overflow:hidden;background:var(--cream2);margin-bottom:10px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.06);">
+            
             <div style="
               position:absolute;
               left:0;
@@ -1584,6 +1590,7 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
               height:100%;
               width:${weightPct}%;
               background:${item.color};
+              transition:width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             "></div>
 
             <div style="
@@ -1593,20 +1600,15 @@ if (moneySlider && moneyLabel && moneyQtyWrap) {
               height:100%;
               width:${proteinPct}%;
               background:${item.proteinColor};
+              border-right:2.5px solid var(--white);
+              transition:width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             "></div>
 
           </div>
 
-          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);line-height:1.55;">
-            <span>Berat: <strong style="color:var(--brown);">${formatGram(item.grams)} g</strong></span>
-            <span>Protein: <strong style="color:var(--brown);">${formatProtein(item.proteinGram)} g</strong></span>
-          </div>
-
-          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);line-height:1.55;">
-            <span>Harga</span>
-            <span style="font-family:'DM Mono',monospace;color:var(--text2);">
-              Rp ${Math.round(item.price).toLocaleString("id-ID")}/kg
-            </span>
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);line-height:1.6;margin-bottom:2px;">
+            <span>Harga per kg: <strong style="font-family:'DM Mono',monospace;color:var(--text2);">Rp ${Math.round(item.price).toLocaleString("id-ID")}</strong></span>
+            <span>Total Protein: <strong style="color:var(--brown);">${formatProtein(item.proteinGram)} g</strong></span>
           </div>
 
         </div>
