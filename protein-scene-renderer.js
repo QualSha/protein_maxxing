@@ -114,7 +114,7 @@
   function fmtPct(v) {
     if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
     const sign = Number(v) > 0 ? "+" : "";
-    return sign + Number(v).toFixed(1).replace(".", ",") + "% YoY";
+    return sign + Number(v).toFixed(1).replace(".", ",") + "%";
   }
   function fmtShortRp(v) {
     if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
@@ -914,20 +914,22 @@ function renderHeroKPIs(scenes) {
     const seasonal = scenes?.seasonal?.rows || {};
     const MONTHS     = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
     const MONTHS_ID  = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+    
+    // 1. Skala warna diubah menjadi Linear: Low (Terang) -> High (Pekat)
     const ROWS = [
-      { key: "sapi",  label: "🐄 Sapi",  colorHigh: [90,122,82],   colorLow: [164,210,156] },
-      { key: "ayam",  label: "🍗 Ayam",  colorHigh: [180,120,20],  colorLow: [220,185,110] },
-      { key: "telur", label: "🥚 Telur", colorHigh: [180,65,30],   colorLow: [225,150,120] }
+      { key: "sapi",  label: "🐄 Sapi",  colorHigh: [50,90,40],    colorLow: [230,235,225] },
+      { key: "ayam",  label: "🍗 Ayam",  colorHigh: [190,95,10],   colorLow: [245,230,210] },
+      { key: "telur", label: "🥚 Telur", colorHigh: [180,40,15],   colorLow: [245,220,210] }
     ];
-    const neutral = [237, 229, 212]; // --cream2
 
-    // Build index per komoditas (baseline = mean = 100)
     const indexed = {};
     const amplitudes = {};
+
     ROWS.forEach(({ key }) => {
       const data = (seasonal[key] || []).slice(0, 12);
       const vals = data.map(d => d.value).filter(v => v > 0);
       const avg  = vals.reduce((a, b) => a + b, 0) / (vals.length || 1);
+
       const idxData = data.map(d => ({
         month:    d.month,
         label:    MONTHS[d.month - 1],
@@ -939,45 +941,51 @@ function renderHeroKPIs(scenes) {
       }));
       indexed[key] = idxData;
 
-      const peak   = idxData.reduce((a, b) => a.index > b.index ? a : b);
-      const trough = idxData.reduce((a, b) => a.index < b.index ? a : b);
+      const peak   = idxData.reduce((a, b) => a.value > b.value ? a : b);
+      const trough = idxData.reduce((a, b) => a.value < b.value ? a : b);
+      
+      // 2. Rumus Amplitudo Baru: (Max - Min) / Min * 100
+      const amp = trough.value > 0 ? ((peak.value - trough.value) / trough.value) * 100 : 0;
+
       amplitudes[key] = {
-        peak, trough,
-        amp: peak.index - trough.index  // in index points = %
+        peak, trough, amp,
+        minIdx: trough.index,
+        maxIdx: peak.index
       };
     });
 
-    // Color: neutral at 100, commodity color above, sage-ish below — NO dark/black
-    function cellBg(key, dev) {
+    // Fungsi transisi warna linear dari nilai index terendah ke tertinggi
+    function cellBg(key, index) {
       const row = ROWS.find(r => r.key === key);
-      const t = Math.max(-1, Math.min(1, dev / 8)); // clamp ±8%
-      const from = t >= 0 ? row.colorHigh : row.colorLow;
-      const u = Math.abs(t);
-      const r = Math.round(neutral[0] + u * (from[0] - neutral[0]));
-      const g = Math.round(neutral[1] + u * (from[1] - neutral[1]));
-      const b = Math.round(neutral[2] + u * (from[2] - neutral[2]));
+      const min = amplitudes[key].minIdx;
+      const max = amplitudes[key].maxIdx;
+      
+      // Hitung posisi (t) dari 0 (paling murah) sampai 1 (paling mahal)
+      const range = Math.max(max - min, 1);
+      const t = Math.max(0, Math.min(1, (index - min) / range)); 
+      
+      const r = Math.round(row.colorLow[0] + t * (row.colorHigh[0] - row.colorLow[0]));
+      const g = Math.round(row.colorLow[1] + t * (row.colorHigh[1] - row.colorLow[1]));
+      const b = Math.round(row.colorLow[2] + t * (row.colorHigh[2] - row.colorLow[2]));
       return `rgb(${r},${g},${b})`;
     }
 
-    // Build tooltip div (hidden, absolute)
-    el.innerHTML = `<div id="seas-tooltip" style="
-      display:none;position:fixed;z-index:9999;
-      background:var(--brown);color:var(--white);
-      border-radius:8px;padding:10px 14px;
-      font-family:'DM Sans',sans-serif;font-size:11.5px;
-      box-shadow:0 4px 20px rgba(0,0,0,0.22);
-      pointer-events:none;min-width:180px;line-height:1.7;
-    "></div>`;
+    el.innerHTML = `<div id="seas-tooltip" style="display:none;position:fixed;z-index:9999;background:var(--brown);color:var(--white);border-radius:8px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:11.5px;box-shadow:0 4px 20px rgba(0,0,0,0.22);pointer-events:none;min-width:180px;line-height:1.7;"></div>`;
 
     const headerCells = MONTHS.map(m =>
-      `<th style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text3);
-        font-weight:500;padding:4px 0;text-align:center;min-width:54px;">${m}</th>`
+      `<th style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text3);font-weight:500;padding:4px 0;text-align:center;min-width:54px;">${m}</th>`
     ).join("");
 
     const dataRows = ROWS.map(({ key, label }) => {
       const cells = (indexed[key] || []).map(d => {
-        const bg  = cellBg(key, d.dev);
-        const sign = d.dev >= 0 ? "+" : "";
+        const bg  = cellBg(key, d.index);
+        
+        // 3. Logika warna font: Putih jika intensitas warna (t) sudah melewati setengah jalan
+        const min = amplitudes[key].minIdx;
+        const max = amplitudes[key].maxIdx;
+        const t = Math.max(0, Math.min(1, (d.index - min) / Math.max(max - min, 1)));
+        const txtColor = (t > 0.55) ? "#FFFFFF" : "#2E1F0E"; 
+        
         return `<td
           data-key="${key}"
           data-month="${d.labelID}"
@@ -985,7 +993,7 @@ function renderHeroKPIs(scenes) {
           data-dev="${d.dev.toFixed(2)}"
           data-value="${d.value}"
           data-avg="${Math.round(d.avg)}"
-          style="background:${bg};color:#2E1F0E !important;border-radius:5px;
+          style="background:${bg};color:${txtColor} !important;border-radius:5px;
             text-align:center;padding:11px 4px;
             font-family:'DM Mono',monospace;font-size:11.5px;font-weight:700;
             cursor:default;transition:filter .15s;min-width:54px;"
@@ -995,9 +1003,7 @@ function renderHeroKPIs(scenes) {
       }).join("");
 
       return `<tr>
-        <td style="font-size:11.5px;font-weight:600;color:var(--text2);
-          padding-right:14px;padding-top:3px;padding-bottom:3px;
-          white-space:nowrap;font-family:'DM Sans',sans-serif;">${label}</td>
+        <td style="font-size:11.5px;font-weight:600;color:var(--text2);padding-right:14px;padding-top:3px;padding-bottom:3px;white-space:nowrap;font-family:'DM Sans',sans-serif;">${label}</td>
         ${cells}
       </tr>`;
     }).join("");
@@ -1011,7 +1017,6 @@ function renderHeroKPIs(scenes) {
         Indeks 100 = rata-rata harga tahunan tiap komoditas. Di atas 100 = lebih mahal dari rata-rata.
       </div>`;
 
-    // Tooltip hover handlers
     window._seasHover = function(e, td) {
       const tt = document.getElementById("seas-tooltip");
       if (!tt) return;
@@ -1051,6 +1056,7 @@ function renderHeroKPIs(scenes) {
       tt.style.left = Math.min(rect.left, window.innerWidth - 210) + "px";
       tt.style.top  = (rect.top - tt.offsetHeight - 8) + "px";
     };
+    
     window._seasOut = function() {
       const tt = document.getElementById("seas-tooltip");
       if (tt) tt.style.display = "none";
@@ -1058,7 +1064,6 @@ function renderHeroKPIs(scenes) {
         .forEach(td => td.style.filter = "");
     };
 
-    // Populate KPI cards + insight
     ROWS.forEach(({ key }) => {
       const { peak, trough, amp } = amplitudes[key];
       const sign = amp >= 0 ? "+" : "";
@@ -1067,7 +1072,6 @@ function renderHeroKPIs(scenes) {
       setText(`seas-${key}-amp`,    `${sign}${amp.toFixed(1).replace(".",",")}%`);
     });
 
-    // Dynamic insight text
     const ampSapi  = amplitudes.sapi?.amp  || 0;
     const ampAyam  = amplitudes.ayam?.amp  || 0;
     const ratio    = ampSapi > 0 ? (ampAyam / ampSapi) : 0;
@@ -1299,8 +1303,7 @@ function renderHeroKPIs(scenes) {
       conclusionEl.innerHTML = conclusion;
     }
   }
-
-  /* ─── SCENE 5: NUTRISI ─── */
+/* ─── SCENE 5: NUTRISI ─── */
   function renderNutrisi(scenes) {
     const nutritionScene = scenes?.nutrition || {};
     const nutrisi = nutritionScene?.raw || {};
@@ -1315,29 +1318,108 @@ function renderHeroKPIs(scenes) {
       telur: Number(efficiency.telur?.proteinPerRp1000) || 3.7
     };
 
-    // Bar chart: protein per Rp 1000
-    const c6b = document.getElementById('c6b');
-    if (c6b && !chartInstances['c6b']) {
-      chartInstances['c6b'] = new Chart(c6b, {
-        type: 'bar',
-        data: {
-          labels: ['Daging Sapi','Daging Ayam','Telur Ayam'],
-          datasets: [{
-            data: [protPer1k.sapi, protPer1k.ayam, protPer1k.telur],
-            backgroundColor: [C.sapi, C.ayam, C.telur],
-            borderRadius: 4, borderWidth: 0
-          }]
+
+    const nutriCardsWrap = document.getElementById("nutri-waffle-cards");
+
+    if (nutriCardsWrap) {
+      const cards = [
+        {
+          label: "Daging Sapi",
+          color: C.sapi,
+          rows: [
+            ["Protein", Number(nutrisi.sapi?.protein) || 18.8, "18,8 g", 25],
+            ["Lemak", Number(nutrisi.sapi?.fat) || 14.0, "14,0 g", 25],
+            ["Kalori", Number(nutrisi.sapi?.calorie) || 201, "201 kal", 300],
+            ["Karbohidrat", Number(nutrisi.sapi?.carb) || 0, "0 g", 25]
+          ]
         },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.parsed.y.toFixed(2)+' g protein per Rp 1.000'}}},
-          scales: {
-            x: {ticks:{color:tick,font:{family:fnt,size:10}}, grid:{color:'transparent'}, border:{color:'transparent'}},
-            y: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>v.toFixed(1)+' g'}, grid:{color:grid}, border:{color:'transparent'},
-                title:{display:true,text:'gram protein per Rp 1.000',color:tick,font:{size:8.5,family:fnt}}}
-          }
+        {
+          label: "Daging Ayam",
+          color: C.ayam,
+          rows: [
+            ["Protein", Number(nutrisi.ayam?.protein) || 18.2, "18,2 g", 25],
+            ["Lemak", Number(nutrisi.ayam?.fat) || 25.0, "25,0 g", 25],
+            ["Kalori", Number(nutrisi.ayam?.calorie) || 298, "298 kal", 300],
+            ["Karbohidrat", Number(nutrisi.ayam?.carb) || 0, "0 g", 25]
+          ]
+        },
+        {
+          label: "Telur Ayam",
+          color: C.telur,
+          rows: [
+            ["Protein", Number(nutrisi.telur?.protein) || 12.4, "12,4 g", 25],
+            ["Lemak", Number(nutrisi.telur?.fat) || 10.8, "10,8 g", 25],
+            ["Kalori", Number(nutrisi.telur?.calorie) || 154, "154 kal", 300],
+            ["Karbohidrat", Number(nutrisi.telur?.carb) || 0.7, "0,7 g", 25]
+          ]
         }
+      ];
+
+      const makeWaffle = (value, max, color) => {
+        const total = 40;
+        const filled = Math.round((value / max) * total);
+
+        return `
+          <div class="nut-waffle-mini">
+            ${Array.from({ length: total }).map((_, i) => `
+              <div class="waffle-cell" style="
+                background:${i < filled ? color : 'var(--cream2)'};
+                opacity:${i < filled ? 1 : 0.55};
+              "></div>
+            `).join("")}
+          </div>
+        `;
+      };
+
+      nutriCardsWrap.innerHTML = cards.map(card => `
+        <div class="nut-waffle-card">
+          <div class="nut-waffle-title">
+            <span class="nut-waffle-dot" style="background:${card.color};"></span>
+            ${card.label}
+          </div>
+
+          ${card.rows.map(([name, value, label, max]) => `
+            <div class="nut-waffle-row">
+              <div class="nut-waffle-label">${name}</div>
+              ${makeWaffle(value, max, card.color)}
+              <div class="nut-waffle-val">${label}</div>
+            </div>
+          `).join("")}
+        </div>
+      `).join("");
+    }
+    // KPI -> Waffle (replaces KPI chart)
+    const kpiWaffleEl = document.getElementById("c6b-waffle");
+    if (kpiWaffleEl) {
+      const items = [
+        { key: "sapi",  label: "Daging Sapi",  val: protPer1k.sapi,  color: C.sapi },
+        { key: "ayam",  label: "Daging Ayam",  val: protPer1k.ayam,  color: C.ayam },
+        { key: "telur", label: "Telur Ayam",   val: protPer1k.telur, color: C.telur }
+      ].sort((a, b) => b.val - a.val);
+
+      const max = Math.max(...items.map(d => d.val), 1);
+      let html = `<div style="font-size:10px;color:var(--text3);margin-bottom:10px;">
+        Tiap baris = 50 sel (skala relatif terhadap komoditas paling efisien).
+      </div>`;
+
+      items.forEach(item => {
+        const filled = Math.max(0, Math.min(50, Math.round((item.val / max) * 50)));
+        html += `<div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;gap:14px;align-items:baseline;margin-bottom:6px;">
+            <div style="font-size:11px;color:var(--text2);"><strong>${item.label}</strong></div>
+            <div style="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--brown);">
+              ${item.val.toFixed(2)} g / Rp 1.000
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(25,1fr);gap:2px;max-width:260px;">
+            ${Array.from({ length: 50 }).map((_, i) =>
+              `<div class="waffle-cell" style="background:${item.color};opacity:${i < filled ? 1 : 0.16};"></div>`
+            ).join("")}
+          </div>
+        </div>`;
       });
+
+      kpiWaffleEl.innerHTML = html;
     }
 
     // Waffle chart efisiensi per Rp10.000
@@ -1410,43 +1492,181 @@ function renderHeroKPIs(scenes) {
       nutCardWaffle.innerHTML = html;
     }
 
-    // Waffle simulasi uang X: berapa gram produk & protein didapat
-    const moneySlider = document.getElementById("money-budget");
-    const moneyLabel = document.getElementById("money-budget-label");
-    const moneyWaffle = document.getElementById("money-waffle-wrap");
-    if (moneySlider && moneyLabel && moneyWaffle) {
-      const base = [
-        { key: "sapi", label: "Daging Sapi", color: C.sapi, price: Number(efficiency.sapi?.pricePerKg) || 145000, protein100: Number(nutrisi.sapi?.protein) || 18.8 },
-        { key: "ayam", label: "Daging Ayam", color: C.ayam, price: Number(efficiency.ayam?.pricePerKg) || 42000, protein100: Number(nutrisi.ayam?.protein) || 18.2 },
-        { key: "telur", label: "Telur Ayam", color: C.telur, price: Number(efficiency.telur?.pricePerKg) || 33000, protein100: Number(nutrisi.telur?.protein) || 12.4 }
+// Budget belanja: tampilkan banyak komoditas yang didapat dalam bar skala tetap 1 kg
+const moneySlider = document.getElementById("money-budget");
+const moneyLabel = document.getElementById("money-budget-label");
+const moneyQtyWrap = document.getElementById("money-qty-wrap");
+
+if (moneySlider && moneyLabel && moneyQtyWrap) {
+  moneySlider.min = 10000;
+  moneySlider.max = 150000;
+  moneySlider.step = 5000;
+
+  const base = [
+    {
+      key: "sapi",
+      label: "Daging Sapi",
+      color: "var(--sapi)",
+      proteinColor: "var(--sage3)",
+      price: Number(efficiency?.sapi?.pricePerKg) || 145000,
+      protein100: Number(nutrisi?.sapi?.protein) || 18.8
+    },
+    {
+      key: "ayam",
+      label: "Daging Ayam",
+      color: "var(--ayam)",
+      proteinColor: "var(--gold3)",
+      price: Number(efficiency?.ayam?.pricePerKg) || 42000,
+      protein100: Number(nutrisi?.ayam?.protein) || 18.2
+    },
+    {
+      key: "telur",
+      label: "Telur Ayam",
+      color: "var(--telur)",
+      proteinColor: "var(--rust2)",
+      price: Number(efficiency?.telur?.pricePerKg) || 33000,
+      protein100: Number(nutrisi?.telur?.protein) || 12.4
+    }
+  ];
+
+  const formatGram = value => Math.round(value).toLocaleString("id-ID");
+  const formatProtein = value => value.toFixed(1).replace(".", ",");
+
+  const updateMoney = () => {
+    const money = Number(moneySlider.value || 50000);
+    moneyLabel.textContent = "Rp " + money.toLocaleString("id-ID");
+
+    const scaleMax = 1000; // fixed: 1 kg
+
+    const computed = base.map(item => {
+      const grams = (money / item.price) * 1000;
+      const proteinGram = (grams / 100) * item.protein100;
+      return { ...item, grams, proteinGram };
+    });
+
+    let html = `
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;line-height:1.5;"> 
+        <br>Skala bar maksimal: <strong>1.000 g (1 kg)</strong>.
+      </div>
+
+      <div style="display:flex;gap:16px;font-size:10px;color:var(--text3);margin-bottom:14px;background:var(--white);padding:8px 12px;border-radius:6px;border:1px solid var(--line2);">
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:12px;height:12px;background:var(--cream);border:2px solid var(--text3);border-radius:3px;"></span>
+          Porsi Protein
+        </span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:12px;height:12px;background:var(--text3);border-radius:3px;"></span>
+          Total Berat
+        </span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:12px;height:12px;background:var(--cream2);border-radius:3px;"></span>
+          Kapasitas
+        </span>
+      </div>
+    `;
+
+    computed.forEach(item => {
+      const weightPct = Math.min((item.grams / scaleMax) * 100, 100);
+      const proteinPct = Math.min((item.proteinGram / scaleMax) * 100, 100);
+      
+      // Indikator teks jika melebihi 1kg
+      const overLimit = item.grams > scaleMax;
+      const weightColor = overLimit ? "var(--rust)" : "var(--brown)";
+
+      html += `
+        <div style="border:1px solid var(--line2);border-radius:10px;padding:14px;background:var(--white);margin-bottom:12px;box-shadow:0 2px 6px rgba(92,61,30,0.03);">
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:12px;">
+              <strong style="color:${item.color};">${item.label}</strong>
+            </span>
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:${weightColor};font-weight:600;">
+              ${formatGram(item.grams)} g ${overLimit ? " ⚠️" : ""}
+            </span>
+          </div>
+
+          <div style="position:relative;height:18px;border-radius:9px;overflow:hidden;background:var(--cream2);margin-bottom:10px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.06);">
+            
+            <div style="
+              position:absolute;
+              left:0;
+              top:0;
+              height:100%;
+              width:${weightPct}%;
+              background:${item.color};
+              transition:width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            "></div>
+
+            <div style="
+              position:absolute;
+              left:0;
+              top:0;
+              height:100%;
+              width:${proteinPct}%;
+              background:${item.proteinColor};
+              border-right:2.5px solid var(--white);
+              transition:width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            "></div>
+
+          </div>
+
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);line-height:1.6;margin-bottom:2px;">
+            <span>Harga per kg: <strong style="font-family:'DM Mono',monospace;color:var(--text2);">Rp ${Math.round(item.price).toLocaleString("id-ID")}</strong></span>
+            <span>Total Protein: <strong style="color:var(--brown);">${formatProtein(item.proteinGram)} g</strong></span>
+          </div>
+
+        </div>
+      `;
+    });
+
+    moneyQtyWrap.innerHTML = html;
+  };
+
+  if (!moneySlider.dataset.bound) {
+    moneySlider.addEventListener("input", updateMoney);
+    moneySlider.dataset.bound = "1";
+  }
+
+  updateMoney();
+}
+    // "Chart 3 komoditas" -> waffle gabungan (komposisi efisiensi protein)
+    const simWaffleEl = document.getElementById("sim-waffle-wrap");
+    if (simWaffleEl) {
+      const items = [
+        { key: "sapi", label: "Daging Sapi", color: C.sapi, val: protPer1k.sapi },
+        { key: "ayam", label: "Daging Ayam", color: C.ayam, val: protPer1k.ayam },
+        { key: "telur", label: "Telur Ayam", color: C.telur, val: protPer1k.telur }
       ];
-      const updateMoney = () => {
-        const money = Number(moneySlider.value || 50000);
-        moneyLabel.textContent = "Rp " + money.toLocaleString("id-ID");
-        let html = `<div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Estimasi yang didapat jika seluruh budget dibelikan satu komoditas (tiap sel = 10g bahan).</div>`;
-        base.forEach(item => {
-          const grams = (money / item.price) * 1000;
-          const proteinGram = (grams / 100) * item.protein100;
-          const filled = Math.max(0, Math.min(100, Math.round(grams / 10)));
-          html += `<div style="margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--text2);margin-bottom:6px;">
-              <span><strong>${item.label}</strong></span>
-              <span>${Math.round(grams).toLocaleString("id-ID")} g · ${proteinGram.toFixed(1).replace(".",",")} g protein</span>
-            </div>
-            <div class="waffle-grid" style="max-width:260px;">
-              ${Array.from({ length: 100 }).map((_, i) =>
-                `<div class="waffle-cell" style="background:${item.color};opacity:${i < filled ? 1 : 0.18};"></div>`
-              ).join("")}
-            </div>
-          </div>`;
-        });
-        moneyWaffle.innerHTML = html;
-      };
-      if (!moneySlider.dataset.bound) {
-        moneySlider.addEventListener("input", updateMoney);
-        moneySlider.dataset.bound = "1";
-      }
-      updateMoney();
+      const total = items.reduce((a, b) => a + (Number(b.val) || 0), 0) || 1;
+
+      // 100 cells total (percentage composition)
+      const parts = items.map(d => ({ ...d, count: Math.round((d.val / total) * 100) }))
+        .sort((a, b) => b.val - a.val);
+      let sum = parts.reduce((a, b) => a + b.count, 0);
+      while (sum > 100) { parts[0].count -= 1; sum -= 1; }
+      while (sum < 100) { parts[0].count += 1; sum += 1; }
+
+      const cells = [];
+      parts.forEach(p => { for (let i = 0; i < p.count; i++) cells.push(p); });
+      while (cells.length < 100) cells.push({ label: "", color: "var(--cream3)" });
+      cells.length = 100;
+
+      simWaffleEl.innerHTML = `
+        <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">
+          Proporsi warna = porsi <strong>efisiensi protein per Rp 1.000</strong> (baseline Apr 2026).
+        </div>
+        <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:10px;">
+          ${parts.map(p => `
+            <span style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text2);">
+              <span style="width:9px;height:9px;border-radius:2px;background:${p.color};display:inline-block;"></span>
+              ${p.label} <span style="font-family:'DM Mono',monospace;color:var(--text3);">(${p.count}%)</span>
+            </span>
+          `).join("")}
+        </div>
+        <div class="waffle-grid" style="max-width:260px;">
+          ${cells.map(c => `<div class="waffle-cell" style="background:${c.color};opacity:0.95;" title="${c.label || ""}"></div>`).join("")}
+        </div>
+      `;
     }
 
     // Insight teks efisiensi
@@ -1488,53 +1708,70 @@ function renderHeroKPIs(scenes) {
     // Bar chart top 10 provinsi
     const c7a = document.getElementById('c7a');
     if (c7a && !chartInstances['c7a']) {
-      chartInstances['c7a'] = new Chart(c7a, {
+        
+        const dataSapi = affLabels.map(prov => {
+            const d = (aff.sapi || []).find(item => item.prov === prov);
+            return d ? d.percentUMP : 44.6; 
+        });
+
+        const dataAyam = affLabels.map(prov => {
+            const d = (aff.ayam || []).find(item => item.prov === prov);
+            return d ? d.percentUMP : 13.5;
+        });
+
+        chartInstances['c7a'] = new Chart(c7a, {
         type: 'bar',
         data: {
-          labels: affLabels,
-          datasets: [{
-            data: affVals,
-            backgroundColor: affVals.map(v => v >= 20 ? 'rgba(196,82,42,0.82)' : v >= 18 ? 'rgba(201,149,42,0.75)' : 'rgba(90,122,82,0.65)'),
-            borderWidth: 0, borderRadius: 3
-          }]
+            labels: affLabels,
+            datasets: [{
+                label: 'Telur Ayam',
+                data: affVals,
+                extraSapi: dataSapi,
+                extraAyam: dataAyam,
+                backgroundColor: 'rgba(201,149,42,0.75)',
+                borderWidth: 0, 
+                borderRadius: 4,
+                barPercentage: 0.85,      
+                categoryPercentage: 0.9,
+            }]
         },
         options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.parsed.x.toFixed(1)+'% UMP untuk penuhi 60g protein/hari'}}},
-          indexAxis: 'y',
-          scales: {
-            x: {ticks:{color:tick,font:{family:fnt,size:9},callback:v=>v+'%'}, grid:{color:grid}, border:{color:'transparent'}, max:25},
-            y: {ticks:{color:tick,font:{family:fnt,size:9}}, grid:{color:'transparent'}, border:{color:'transparent'}}
-          }
-        }
-      });
-    }
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(45, 36, 26, 0.95)',
+                    padding: 12,
+                    callbacks: {
+                        title: (ctx) => `Prov. ${ctx[0].label}`,
+                        label: (ctx) => {
+                            // Ambil data asli (Telur)
+                            const telurVal = ctx.parsed.y.toFixed(1);
+                            // Ambil data extra dari dataset yang sama pakai index yang pas
+                            const idx = ctx.dataIndex;
+                            const sapiVal = ctx.dataset.extraSapi[idx].toFixed(1);
+                            const ayamVal = ctx.dataset.extraAyam[idx].toFixed(1);
 
-    // Donut chart dihapus, ganti ringkasan beban per komoditas
-    const donutWrap = document.getElementById('afford-donut-wrap');
-    if (donutWrap) {
-      if (chartInstances['c7b']) {
-        chartInstances['c7b'].destroy();
-        delete chartInstances['c7b'];
-      }
-      donutWrap.innerHTML = `<div style="width:100%;display:flex;flex-direction:column;gap:12px;">
-        ${sortedAvg.map(item => `
-          <div style="padding:12px 14px;border:1px solid var(--line2);border-radius:8px;background:var(--white);">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px;">
-              <span style="font-size:11.5px;color:var(--text2);">${item.label}</span>
-              <strong style="font-family:'DM Mono',monospace;color:var(--brown);">${item.value.toFixed(1).replace(".", ",")}% UMP</strong>
-            </div>
-            <div style="height:6px;background:var(--cream2);border-radius:4px;overflow:hidden;">
-              <div style="height:6px;background:${item.color};width:${Math.min(item.value, 60) / 60 * 100}%;"></div>
-            </div>
-          </div>
-        `).join("")}
-        <div style="font-size:10px;color:var(--text3);line-height:1.5;">Rata-rata nasional kebutuhan biaya untuk memenuhi 60g protein/hari selama 30 hari, dibanding UMP 2025.</div>
-      </div>`;
-    }
+                            return [
+                                `🥩 Daging Sapi: ${sapiVal}% UMP (Bandingan)`,
+                                `🍗 Daging Ayam: ${ayamVal}% UMP (Bandingan)`,
+                                `🥚 Telur Ayam: ${telurVal}% UMP`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: tick, font: { family: fnt, size: 9 } }, grid: { display: false }, border: { color: 'transparent' } },
+                y: { ticks: { color: tick, font: { family: fnt, size: 9 }, callback: v => v + '%' }, grid: { color: grid }, border: { color: 'transparent' }, max: 25 }
+            }
+        }
+    });
+    } 
   }
 
-  /* ─── SCENE 7: FORECAST ─── */
+  /* FORECAST */
   function renderForecast(scenes) {
     const monthly = scenes?.trend?.monthly || [];
     const C = COLORS;
