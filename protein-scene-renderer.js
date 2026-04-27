@@ -1194,13 +1194,24 @@ function renderHeroKPIs(scenes) {
     ].sort((a, b) => b.value - a.value);
 
     // KPI cards -> beban protein per komoditas
-    setText('afford-worst-val',   `${sortedAvg[0].value.toFixed(1).replace(".", ",")}%`);
-    setText('afford-worst-unit',  `${sortedAvg[0].label} — rata-rata nasional`);
-    setText('afford-natavg-val',  `${sortedAvg[1].value.toFixed(1).replace(".", ",")}%`);
-    setText('afford-natavg-unit', `${sortedAvg[1].label} — rata-rata nasional`);
-    setText('afford-best-val',    `${sortedAvg[2].value.toFixed(1).replace(".", ",")}%`);
-    setText('afford-best-unit',   `${sortedAvg[2].label} — rata-rata nasional`);
+    const acuanUMP = 3100000; 
 
+    // Update KPI cards dengan format baru
+    sortedAvg.forEach((item, index) => {
+        const ids = ['afford-worst', 'afford-natavg', 'afford-best'];
+        const prefix = ids[index];
+
+        // HITUNG RUPIAH: (persen / 100 * UMP) / 30 hari
+        const dailyPrice = Math.round((item.value / 100 * acuanUMP) / 30);
+        const monthlyPrice = dailyPrice * 30;
+        const percentage = item.value.toFixed(1).replace(".", ",");
+
+        // ISI KE HTML (Pastikan ID di HTML sudah diganti ke suffix -daily, -desc, -footer)
+        setText(`${prefix}-daily`, `Rp ${dailyPrice.toLocaleString('id-ID')}/hari`);
+        setText(`${prefix}-desc`, `untuk 60g protein ${item.label} · nasional Apr 2026`);
+        setText(`${prefix}-footer`, `Rp ${monthlyPrice.toLocaleString('id-ID')}/bulan · ${percentage}% UMP nasional`);
+    });
+    
     // Bar chart top 10 provinsi
     const c7a = document.getElementById('c7a');
     if (c7a && !chartInstances['c7a']) {
