@@ -95,7 +95,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:cen
 .legend-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 
 /* GRID */
-.grid1 { display: block; width: 100%; }
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
 
@@ -442,9 +441,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
         </div>
         <div class="chart-card" style="margin-bottom:0;">
           <div class="chart-label">10 provinsi dengan harga tertinggi (Rp/kg)</div>
-          <div class="chart-area" style="height:240px;"><canvas id="c2a"></canvas></div>
+          <div class="chart-area" style="height:300px;"><canvas id="c2a"></canvas></div>
         </div>
       </div>
+      
     </div>
     <div id="land-ayam" class="tab-panel">
       <div class="grid2">
@@ -523,13 +523,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
         <div class="chart-card" style="margin-bottom:0;">
           <div class="chart-label">Harga rata-rata nasional — Jan 2024 s.d. Apr 2026 (Rp/kg)</div>
           <div class="legend">
-            <span class="legend-item" data-group="sapi" onclick="toggleLegend(this)">
+            <span class="legend-item dimmed" data-label="Daging Sapi" onclick="toggleLegend(this)">
               <span class="legend-dot" style="background:var(--sapi)"></span>Daging sapi
             </span>
-            <span class="legend-item" data-group="ayam-telur" onclick="toggleLegend(this)">
+            <span class="legend-item" data-label="Daging Ayam" onclick="toggleLegend(this)">
               <span class="legend-dot" style="background:var(--ayam)"></span>Daging ayam
             </span>
-            <span class="legend-item" data-group="ayam-telur" onclick="toggleLegend(this)">
+            <span class="legend-item" data-label="Telur Ayam" onclick="toggleLegend(this)">
               <span class="legend-dot" style="background:var(--telur)"></span>Telur ayam
             </span>
           </div>
@@ -648,19 +648,26 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       <p class="sec-lead">Provinsi dengan upah minimum rendah justru cenderung membayar harga pangan yang lebih tinggi. Bukan karena permintaannya besar, melainkan karena rantai distribusi ke sana lebih panjang dan mahal.</p>
     </div>
 
+    <div class="tab-row reveal">
+      <button class="tab-btn active" onclick="switchKetimpanganTab('sapi',this)">Daging Sapi</button>
+      <button class="tab-btn" onclick="switchKetimpanganTab('ayam',this)">Daging Ayam</button>
+      <button class="tab-btn" onclick="switchKetimpanganTab('telur',this)">Telur Ayam</button>
+    </div>
+
     <div class="grid2 reveal">
       <div class="chart-card" style="margin-bottom:0;">
-        <div class="chart-label">Harga sapi vs UMP per pulau — Apr 2026 (setiap titik = rata-rata pulau)</div>
-        <div class="chart-area" style="height:320px;"><canvas id="c4a"></canvas></div>
+        <div class="chart-label">Harga per komoditas vs UMP — Apr 2026</div>
+        <div class="chart-area" style="height:340px;"><canvas id="c4a"></canvas></div>
+        <div id="ketimpangan-legend" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:11px;"></div>
       </div>
-      <div class="chart-card" style="margin-bottom:0;">
+      <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column;justify-content:center;">
         <div class="chart-label">Gap harga maks - min antar provinsi per komoditas (Rp/kg)</div>
-        <div id="gap-lollipop" style="padding:24px 0;"></div>
+        <div id="gap-lollipop" style="padding:8px 0;"></div>
       </div>
     </div>
 
-    <div class="story-callout reveal" style="margin-top:12px;">
-      Titik-titik di kanan bawah scatter plot menandakan provinsi dengan UMP tinggi dan harga sapi tidak ikut tinggi, seperti DKI Jakarta dan Kepulauan Riau. Sebaliknya, beberapa provinsi Jawa dengan UMP terendah membayar harga sapi di kisaran Rp 139.000–155.000.
+    <div class="story-callout reveal" id="ketimpangan-conclusion" style="margin-top:12px;">
+      [Kesimpulan akan diisi otomatis dari data]
     </div>
   </div>
   </div>
@@ -671,7 +678,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   <div class="section-inner">
   <div class="container">
     <div class="reveal">
-      <div class="eyebrow">05 — Nilai Gizi per Rupiah</div>
+      <div class="eyebrow">Nilai Gizi per Rupiah</div>
       <h2 class="sec-title">Bukan soal harga,<br>soal <em>nilai gizinya</em></h2>
       <p class="sec-lead">Ketika harga naik, yang berubah bukan hanya pengeluaran: efisiensi nutrisi per rupiah juga berubah. Komoditas termurah belum tentu yang paling efisien untuk memenuhi kebutuhan protein harian.</p>
     </div>
@@ -774,7 +781,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   </div>
 </section>
 
-<!-- DAYA BELI -->
+<!-- SCENE 6: DAYA BELI -->
 <section class="section sec-white" id="s7" data-label="Daya Beli">
   <div class="section-inner">
   <div class="container">
@@ -788,32 +795,28 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--rust);"></div>
         <div class="kpi-tag">Beban protein tertinggi</div>
-        <div class="kpi-val" id="afford-worst-daily">-</div> 
-        <div class="kpi-unit" id="afford-worst-desc">-</div>
-        <div class="kpi-divider"></div>
-        <div class="kpi-note" id="afford-worst-footer">-</div>
+        <div class="kpi-val" id="afford-worst-val">-</div>
+        <div class="kpi-unit" id="afford-worst-unit">-</div>
+        <div class="afford-zone zone-red" style="margin-top:6px;">Rata-rata nasional</div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--gold);"></div>
         <div class="kpi-tag">Beban protein menengah</div>
-        <div class="kpi-val" id="afford-natavg-daily">-</div> 
-        <div class="kpi-unit" id="afford-natavg-desc">-</div>
+        <div class="kpi-val" id="afford-natavg-val">-</div>
+        <div class="kpi-unit" id="afford-natavg-unit">-</div>
         <div class="kpi-divider"></div>
-        <div class="kpi-note" id="afford-natavg-footer">-</div>
+        <div class="kpi-note">Persentase UMP untuk memenuhi 60g protein/hari selama 30 hari</div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-card-accent" style="background:var(--sage);"></div>
         <div class="kpi-tag">Beban protein terendah</div>
-        <div class="kpi-val" id="afford-best-daily">-</div> 
-        <div class="kpi-unit" id="afford-best-desc">-</div>
-        <div class="kpi-divider"></div>
-        <div class="kpi-note" id="afford-best-footer">-</div>
+        <div class="kpi-val" id="afford-best-val">-</div>
+        <div class="kpi-unit" id="afford-best-unit">-</div>
+        <div class="afford-zone zone-ok" style="margin-top:6px;">Rata-rata nasional</div>
       </div>
     </div>
 
-    <div class="grid1 reveal">
+    <div class="grid2 reveal">
       <div class="chart-card" style="margin-bottom:0;">
         <div class="chart-label">10 provinsi dengan beban protein telur tertinggi (% UMP 2025, harga Apr 2026)</div>
         <div class="chart-area" style="height:280px;"><canvas id="c7a"></canvas></div>
@@ -827,7 +830,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   </div>
 </section>
 
-<!-- PENUTUP -->
+<!-- SCENE 7: PENUTUP -->
 <section class="section" id="s8" data-label="Kesimpulan" style="background:var(--brown);">
   <div class="section-inner">
   <div class="container">
@@ -907,7 +910,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
               <div>
                 <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">Kemenkes RI</div>
                 <div style="font-size:11.5px;font-weight:600;color:var(--brown);margin-bottom:4px;">Tabel Komposisi Pangan Indonesia (TKPI)</div>
-                <div style="font-size:10px;color:var(--text3);line-height:1.5;">Data kandungan gizi: protein, lemak, karbohidrat, kalori per 100g untuk daging sapi (FR026), ayam (FR005), dan telur (HR002).</div>
+                <div style="font-size:10px;color:var(--text3);line-height:1.5;">Data kandungan gizi: protein, lemak, karbohidrat, kalori per 100g untuk daging sapi, ayam, dan telur.</div>
                 <div style="font-size:9px;color:var(--gold);margin-top:6px;font-family:'DM Mono',monospace;">repository.kemkes.go.id ↗</div>
               </div>
             </div>
@@ -939,40 +942,40 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
           <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 10px;background:linear-gradient(135deg,var(--sapi),var(--sage2));display:flex;align-items:center;justify-content:center;border:2px solid var(--line2);">
             <span style="font-size:26px;">👩‍💻</span>
           </div>
-          <div style="font-size:11px;font-weight:600;color:var(--brown);">Ayu Rahmawati</div>
-          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">Data Analyst</div>
+          <div style="font-size:11px;font-weight:600;color:var(--brown);">Annisa Raihana Mudzakir</div>
+          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">222312986</div>
         </div>
         <!-- Member 2 -->
         <div style="text-align:center;">
           <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 10px;background:linear-gradient(135deg,var(--ayam),var(--gold2));display:flex;align-items:center;justify-content:center;border:2px solid var(--line2);">
             <span style="font-size:26px;">👨‍🔬</span>
           </div>
-          <div style="font-size:11px;font-weight:600;color:var(--brown);">Budi Santoso</div>
-          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">Visualisasi Data</div>
+          <div style="font-size:11px;font-weight:600;color:var(--brown);">Aulia Ul Hasanah</div>
+          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">222313000</div>
         </div>
         <!-- Member 3 -->
         <div style="text-align:center;">
           <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 10px;background:linear-gradient(135deg,var(--telur),var(--rust2));display:flex;align-items:center;justify-content:center;border:2px solid var(--line2);">
             <span style="font-size:26px;">👩‍🏫</span>
           </div>
-          <div style="font-size:11px;font-weight:600;color:var(--brown);">Citra Dewi</div>
-          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">Riset & Narasi</div>
+          <div style="font-size:11px;font-weight:600;color:var(--brown);">Farhiya Salsa Billa</div>
+          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">222313080</div>
         </div>
         <!-- Member 4 -->
         <div style="text-align:center;">
           <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 10px;background:linear-gradient(135deg,var(--brown2),var(--brown3));display:flex;align-items:center;justify-content:center;border:2px solid var(--line2);">
             <span style="font-size:26px;">👨‍💼</span>
           </div>
-          <div style="font-size:11px;font-weight:600;color:var(--brown);">Dimas Pratama</div>
-          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">Pengumpulan Data</div>
+          <div style="font-size:11px;font-weight:600;color:var(--brown);">Haykal Pasha Erfaringga</div>
+          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">222313117</div>
         </div>
         <!-- Member 5 -->
         <div style="text-align:center;">
           <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 10px;background:linear-gradient(135deg,var(--sage),var(--sage3));display:flex;align-items:center;justify-content:center;border:2px solid var(--line2);">
             <span style="font-size:26px;">👩‍🎨</span>
           </div>
-          <div style="font-size:11px;font-weight:600;color:var(--brown);">Eka Putri</div>
-          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">Desain & Layout</div>
+          <div style="font-size:11px;font-weight:600;color:var(--brown);">M. Faruq Hafidzullah Siregar</div>
+          <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;">222313186</div>
         </div>
       </div>
     </div>
@@ -1040,6 +1043,7 @@ function buildSim() {
       }
     }
   });
+  
   function upd() {
     const ps = +document.getElementById('ps').value;
     const pa = +document.getElementById('pa').value;
@@ -1062,44 +1066,50 @@ function buildSim() {
 }
 
 window.toggleLegend = function(el) {
-  // Ambil instance canvas chart di card ini
   const chartId = el.closest('.chart-card').querySelector('canvas').id;
   const chart = Chart.getChart(chartId);
   if (!chart) return;
 
-  const group = el.dataset.group;
   const allItems = el.parentElement.querySelectorAll('.legend-item');
-  
-  // Cek apakah tombol yang diklik saat ini adalah SATU-SATUNYA yang sedang aktif
-  const isActive = !el.classList.contains('dimmed') && 
-                   Array.from(allItems).some(item => item.classList.contains('dimmed'));
+  const dsLabel  = el.dataset.label; // label dataset yang diklik
 
-  if (isActive) {
-    // ATURAN 3.4: Klik legenda yang sedang aktif -> Tampilkan Semua
-    allItems.forEach(item => item.classList.remove('dimmed'));
+  // Cari dataset index berdasarkan data-label
+  const dsIndex = chart.data.datasets.findIndex(ds =>
+    ds.label === dsLabel
+  );
+  if (dsIndex === -1) return;
+
+  // Cek apakah minimal ada 1 dataset lain yang visible
+  const currentlyVisible = chart.data.datasets
+    .map((ds, i) => ({ hidden: ds.hidden, i }))
+    .filter(d => !d.hidden);
+
+  const clickedIsVisible = !chart.data.datasets[dsIndex].hidden;
+
+  // Kalau yang diklik satu-satunya yang visible, jangan sembunyikan (minimal 1 harus tampil)
+  if (clickedIsVisible && currentlyVisible.length === 1) {
+    // Show semua sebagai reset
     chart.data.datasets.forEach(ds => ds.hidden = false);
+    allItems.forEach(item => item.classList.remove('dimmed'));
   } else {
-    // ATURAN 3.3: Redupkan semua, lalu nyalakan sesuai grup yang diklik
-    allItems.forEach(item => {
-      if (item.dataset.group === group) item.classList.remove('dimmed');
-      else item.classList.add('dimmed');
-    });
-    
-    // ATURAN 3.1 & 3.2: Filter dataset yang muncul
-    chart.data.datasets.forEach((ds) => {
-      // Menggunakan nama label dataset ('Daging Sapi', 'Daging Ayam', dst)
-      const isSapi = ds.label.toLowerCase().includes('sapi');
-      
-      if (group === 'sapi') {
-        ds.hidden = !isSapi; // Hanya sapi yang false (ditampilkan)
-      } else if (group === 'ayam-telur') {
-        ds.hidden = isSapi;  // Sapi disembunyikan, sisanya (ayam & telur) ditampilkan
-      }
-    });
+    // Toggle dataset yang diklik
+    chart.data.datasets[dsIndex].hidden = clickedIsVisible;
+    el.classList.toggle('dimmed', clickedIsVisible);
   }
-  chart.update(); // Render ulang chart dengan kondisi terbaru
-};
 
+  chart.update();
+};
+window.switchKetimpanganTab = function(commodity, btn) {
+  // Update active tab button
+  if (btn && btn.closest('.tab-row')) {
+    btn.closest('.tab-row').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  // Re-render scatter plot dengan komoditas yang dipilih
+  if (window.ProteinSceneRenderer && window.PROTEIN_SCENE_DATA) {
+    ProteinSceneRenderer.renderKetimpanganByComodity(window.PROTEIN_SCENE_DATA, commodity);
+  }
+};
 window.addEventListener('DOMContentLoaded', () => {
   const sections = document.querySelectorAll('section[id]');
   const navDots = document.getElementById('navDots');
@@ -1117,7 +1127,7 @@ window.addEventListener('DOMContentLoaded', () => {
         d.innerHTML = '👤';
         d.style.fontSize = '13px';
       } else {
-        d.textContent = String(i + 1).padStart(2, '0');
+        d.textContent = String(i).padStart(2, '0');
       }
       d.title = s.dataset.label || '';
       d.onclick = () => s.scrollIntoView({ behavior: 'smooth' });
